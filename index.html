@@ -8,6 +8,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Marmotte">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icon_bestellungen_favicon32.png">
+<link rel="apple-touch-icon" href="assets/icon_bestellungen_appletouch180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
@@ -253,6 +256,17 @@
       forgotSubmitBtn.textContent = "Link senden";
     }
   });
+
+  // Service Worker registrieren, damit die App installierbar ist
+  // und offline funktioniert.
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./sw.js").catch((err) => {
+        console.warn("Service Worker konnte nicht registriert werden:", err);
+      });
+    });
+  }
+
 </script>
 
 </body>
