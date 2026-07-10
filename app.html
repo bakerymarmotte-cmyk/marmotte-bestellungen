@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marmotte Bestellungen</title>
+<meta name="theme-color" content="#1A1A1A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Marmotte">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icon_bestellungen_favicon32.png">
+<link rel="apple-touch-icon" href="assets/icon_bestellungen_appletouch180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+  html, body { height: 100%; }
+  body { display: flex; flex-direction: column; }
+
+  /* ---------- Header ---------- */
+  .app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .app-header .brand {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 19px;
+    color: var(--color-yellow);
+    letter-spacing: -0.01em;
+  }
+  .app-header .brand small {
+    display: block;
+    font-family: var(--font-body);
+    font-weight: 400;
+    font-size: 11px;
+    color: var(--color-text-muted);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    margin-top: 1px;
+  }
+  .user-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .user-meta { text-align: right; }
+  .user-meta .name {
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+  .user-meta .role {
+    font-size: 11.5px;
+    color: var(--color-text-muted);
+    text-transform: capitalize;
+  }
+  .logout-btn {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+  .logout-btn:hover { color: var(--color-danger); border-color: rgba(229, 72, 77, 0.4); }
+
+  /* ---------- Main content ---------- */
+  main {
+    flex: 1;
+    padding: 20px 16px 96px;
+    max-width: 640px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  .view { display: none; }
+  .view.active { display: block; }
+  .view-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 4px 0 16px;
+  }
+  .placeholder-card {
+    padding: 28px 22px;
+    text-align: center;
+    color: var(--color-text-muted);
+    font-size: 14px;
+  }
+  .placeholder-card .stage-tag {
+    display: inline-block;
+    background: var(--color-surface-raised);
+    color: var(--color-yellow);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.03em;
+    padding: 4px 10px;
+    border-radius: 20px;
+    margin-bottom: 12px;
+  }
+
+  /* Sub-tabs (z.B. innerhalb "Bestellung erstellen") */
+  .subtabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 18px;
+    overflow-x: auto;
+  }
+  .subtab-btn {
+    flex: none;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    border-radius: 20px;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .subtab-btn.active {
+    background: var(--color-yellow);
+    color: #1a1400;
+    border-color: var(--color-yellow);
+  }
+
+  /* ---------- Bottom tab bar ---------- */
+  .tabbar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+    z-index: 10;
+  }
+  .tab-btn {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--color-text-muted);
+    font-family: var(--font-body);
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 8px 4px 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    border-radius: var(--radius-sm);
+    text-align: center;
+  }
+  .tab-btn .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: transparent;
+  }
+  .tab-btn.active { color: var(--color-yellow); }
+  .tab-btn.active .dot { background: var(--color-yellow); }
+
+  .loading-screen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    color: var(--color-text-muted);
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+
+<div id="loading-screen" class="loading-screen">Wird geladen …</div>
+
+<div id="app-shell" style="display:none;">
+  <header class="app-header">
+    <div class="brand">Marmotte<small>Bestellungen</small></div>
+    <div class="user-box">
+      <div class="user-meta">
+        <div class="name" id="user-name">–</div>
+        <div class="role" id="user-role">–</div>
+      </div>
+      <button type="button" class="logout-btn" id="logout-btn">Abmelden</button>
+    </div>
+  </header>
+
+  <main id="main-content">
+    <!-- Views werden per JS eingefügt, je nach Rolle -->
+  </main>
+
+  <nav class="tabbar" id="tabbar">
+    <!-- Tabs werden per JS eingefügt, je nach Rolle -->
+  </nav>
+</div>
+
+<script type="module">
+  import { auth, db } from "./firebase-config.js";
+  import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  // ---------------------------------------------------------------------
+  // Tab-Konfiguration je Rolle.
+  // Jeder Tab hat eine id (= View-id) und ein Label.
+  // "erstellen" (admin/leitung) hat zusätzlich Sub-Tabs zur Typ-Auswahl.
+  // ---------------------------------------------------------------------
+  const TABS_BY_ROLE = {
+    admin: [
+      { id: "bestellungen", label: "Bestellungen" },
+      { id: "erstellen", label: "Bestellung erstellen" },
+      { id: "einstellungen", label: "Einstellungen" },
+    ],
+    leitung: [
+      { id: "bestellungen", label: "Bestellungen" },
+      { id: "erstellen", label: "Bestellung erstellen" },
+      { id: "einstellungen", label: "Einstellungen" },
+    ],
+    abteilung: [
+      { id: "bestellungen", label: "Bestellungen" },
+      { id: "neu-abteilung", label: "Abteilung" },
+      { id: "neu-kunde", label: "Kunde" },
+      { id: "neu-hotel", label: "Hotel/Rest." },
+    ],
+    hotelrestaurant: [
+      { id: "bestellungen", label: "Bestellungen" },
+      { id: "neu", label: "Neue Bestellung" },
+    ],
+  };
+
+  const ROLE_LABELS = {
+    admin: "Admin",
+    leitung: "Leitung",
+    abteilung: "Abteilung",
+    hotelrestaurant: "Hotel / Restaurant",
+  };
+
+  // Placeholder-Inhalt je View-id. Wird in späteren Schichten durch
+  // echte Formulare/Listen ersetzt.
+  const VIEW_PLACEHOLDERS = {
+    "bestellungen": "Übersicht aller Bestellungen – wird in Schicht 2 gebaut.",
+    "erstellen": null, // hat Sub-Tabs, siehe renderErstellenView
+    "einstellungen": null, // hat Sub-Tabs, siehe renderEinstellungenView
+    "neu-abteilung": "Formular Abteilungsbestellung – wird in Schicht 2 gebaut.",
+    "neu-kunde": "Formular Kundenbestellung – wird in Schicht 2 gebaut.",
+    "neu-hotel": "Formular Hotel/Restaurant-Bestellung – wird in Schicht 2 gebaut.",
+    "neu": "Formular Neue Bestellung – wird in Schicht 2 gebaut.",
+  };
+
+  const ERSTELLEN_SUBTABS = [
+    { id: "abteilung", label: "Abteilungsbestellung" },
+    { id: "kunde", label: "Kundenbestellung" },
+    { id: "hotel", label: "Hotel/Restaurant" },
+  ];
+
+  const EINSTELLUNGEN_SUBTABS = [
+    { id: "artikel-abteilung", label: "Artikel Abteilung/Kunde" },
+    { id: "artikel-hotel", label: "Artikel Hotel/Restaurant" },
+    { id: "bestellschluss", label: "Bestellschluss-Zeiten" },
+  ];
+
+  function placeholderCard(text) {
+    return `
+      <div class="card placeholder-card">
+        <span class="stage-tag">Schicht 1 – Shell</span>
+        <p>${text}</p>
+      </div>
+    `;
+  }
+
+  function renderSubtabView(containerId, subtabs, contentPrefix) {
+    const container = document.getElementById(containerId);
+    const nav = document.createElement("div");
+    nav.className = "subtabs";
+    subtabs.forEach((st, i) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "subtab-btn" + (i === 0 ? " active" : "");
+      btn.textContent = st.label;
+      btn.dataset.subtab = st.id;
+      btn.addEventListener("click", () => {
+        nav.querySelectorAll(".subtab-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        container.querySelectorAll(".subtab-panel").forEach((p) => p.style.display = "none");
+        document.getElementById(`${contentPrefix}-${st.id}`).style.display = "block";
+      });
+      nav.appendChild(btn);
+    });
+    container.appendChild(nav);
+
+    subtabs.forEach((st, i) => {
+      const panel = document.createElement("div");
+      panel.className = "subtab-panel";
+      panel.id = `${contentPrefix}-${st.id}`;
+      panel.style.display = i === 0 ? "block" : "none";
+      panel.innerHTML = placeholderCard(`${st.label} – wird in Schicht 2 gebaut.`);
+      container.appendChild(panel);
+    });
+  }
+
+  function buildViews(tabs) {
+    const main = document.getElementById("main-content");
+    main.innerHTML = "";
+
+    tabs.forEach((tab, i) => {
+      const view = document.createElement("section");
+      view.className = "view" + (i === 0 ? " active" : "");
+      view.id = `view-${tab.id}`;
+
+      const title = document.createElement("div");
+      title.className = "view-title";
+      title.textContent = tab.label;
+      view.appendChild(title);
+
+      if (tab.id === "erstellen") {
+        main.appendChild(view);
+        renderSubtabView(`view-${tab.id}`, ERSTELLEN_SUBTABS, "erstellen");
+      } else if (tab.id === "einstellungen") {
+        main.appendChild(view);
+        renderSubtabView(`view-${tab.id}`, EINSTELLUNGEN_SUBTABS, "einstellungen");
+      } else {
+        const body = document.createElement("div");
+        body.innerHTML = placeholderCard(VIEW_PLACEHOLDERS[tab.id] || "Kommt in einer späteren Schicht.");
+        view.appendChild(body);
+        main.appendChild(view);
+      }
+    });
+  }
+
+  function buildTabbar(tabs) {
+    const bar = document.getElementById("tabbar");
+    bar.innerHTML = "";
+    tabs.forEach((tab, i) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "tab-btn" + (i === 0 ? " active" : "");
+      btn.dataset.tab = tab.id;
+      btn.innerHTML = `<span class="dot"></span><span>${tab.label}</span>`;
+      btn.addEventListener("click", () => {
+        bar.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
+        document.getElementById(`view-${tab.id}`).classList.add("active");
+        window.scrollTo({ top: 0, behavior: "instant" });
+      });
+      bar.appendChild(btn);
+    });
+  }
+
+  function initApp(role, name) {
+    const tabs = TABS_BY_ROLE[role] || TABS_BY_ROLE.abteilung;
+
+    document.getElementById("user-name").textContent = name || "–";
+    document.getElementById("user-role").textContent = ROLE_LABELS[role] || role;
+
+    buildViews(tabs);
+    buildTabbar(tabs);
+
+    document.getElementById("loading-screen").style.display = "none";
+    document.getElementById("app-shell").style.display = "block";
+  }
+
+  // -----------------------------------------------------------------
+  // Auth-Check: nicht eingeloggt -> zurück zum Login.
+  // Rolle/Name kommen aus sessionStorage (von index.html gesetzt);
+  // falls nicht vorhanden (z.B. Seite neu geöffnet), aus Firestore nachladen.
+  // -----------------------------------------------------------------
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+      window.location.href = "index.html";
+      return;
+    }
+
+    let role = sessionStorage.getItem("marmotte_role");
+    let name = sessionStorage.getItem("marmotte_name");
+
+    if (!role) {
+      try {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (!userDoc.exists()) {
+          await signOut(auth);
+          window.location.href = "index.html";
+          return;
+        }
+        const data = userDoc.data();
+        if (data.active === false) {
+          await signOut(auth);
+          window.location.href = "index.html";
+          return;
+        }
+        role = data.role || "abteilung";
+        name = data.name || "";
+        sessionStorage.setItem("marmotte_role", role);
+        sessionStorage.setItem("marmotte_name", name);
+      } catch (err) {
+        console.error(err);
+        window.location.href = "index.html";
+        return;
+      }
+    }
+
+    initApp(role, name);
+  });
+
+  document.getElementById("logout-btn").addEventListener("click", async () => {
+    await signOut(auth);
+    sessionStorage.removeItem("marmotte_role");
+    sessionStorage.removeItem("marmotte_name");
+    window.location.href = "index.html";
+  });
+
+  // Service Worker registrieren (falls noch nicht aktiv, z.B. Direktaufruf von app.html)
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./sw.js").catch((err) => {
+        console.warn("Service Worker konnte nicht registriert werden:", err);
+      });
+    });
+  }
+</script>
+
+</body>
+</html>
