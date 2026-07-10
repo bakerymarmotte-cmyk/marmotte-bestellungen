@@ -1,6 +1,6 @@
 {
   "name": "Marmotte Bestellungen",
-  "short_name": "Marmotte",
+  "short_name": "Marmotte Bestellungen",
   "description": "Marmotte Bestellungen – Verwaltung und Erfassung von Bestellungen",
   "start_url": "./index.html",
   "scope": "./",
