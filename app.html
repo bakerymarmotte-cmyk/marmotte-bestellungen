@@ -290,6 +290,33 @@
     border-radius: var(--radius-sm);
     font-size: 15px;
   }
+
+  .type-badge {
+    display: inline-block;
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 3px 9px;
+    border-radius: 12px;
+    background: var(--color-surface-raised);
+    color: var(--color-text-muted);
+  }
+  .type-badge.type-abteilung { color: #8ecbff; }
+  .type-badge.type-kunde { color: #ffd27a; }
+  .type-badge.type-hotel { color: #b7f0c0; }
+
+  .status-tag {
+    display: inline-block;
+    flex: none;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 11px;
+    border-radius: 14px;
+    white-space: nowrap;
+  }
+  .status-tag.status-offen { background: rgba(253, 214, 0, 0.12); color: var(--color-yellow); }
+  .status-tag.status-in_verarbeitung { background: rgba(76, 175, 125, 0.15); color: var(--color-success); }
 </style>
 </head>
 <body>
@@ -322,7 +349,7 @@
   import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import {
     doc, getDoc, getDocs, setDoc, collection, addDoc, updateDoc, deleteDoc,
-    onSnapshot, serverTimestamp,
+    onSnapshot, serverTimestamp, query, where,
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   // ---------------------------------------------------------------------
@@ -1138,6 +1165,296 @@
     });
   }
 
+  // -----------------------------------------------------------------
+  // Hotel/Restaurant-Bestellung erstellen.
+  // Wird von Rolle 'hotelrestaurant' (eigenes Hotel fix), 'abteilung' und
+  // admin/leitung (Hotel per Dropdown wählbar) verwendet. Eigene,
+  // ungruppierte Artikelliste artikel_hotel, alphabetisch sortiert.
+  // -----------------------------------------------------------------
+  async function initHotelbestellungForm(container, { role, uid }) {
+    container.innerHTML = `<div class="card placeholder-card"><p>Formular wird geladen …</p></div>`;
+
+    const bestellschlussErreicht = await isBestellschlussErreicht("hotel");
+
+    let ownHotelName = null;
+    let hotelOptions = [];
+    if (role === "hotelrestaurant") {
+      try {
+        const userSnap = await getDoc(doc(db, "users", uid));
+        ownHotelName = userSnap.exists() ? userSnap.data().hotelName : null;
+      } catch (err) {
+        console.error(err);
+      }
+    } else {
+      try {
+        const q = query(collection(db, "users"), where("role", "==", "hotelrestaurant"));
+        const snap = await getDocs(q);
+        hotelOptions = snap.docs
+          .map((d) => ({ uid: d.id, ...d.data() }))
+          .filter((u) => u.active !== false)
+          .sort((a, b) => (a.hotelName || "").localeCompare(b.hotelName || "", "de"));
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    let artikelListRaw = [];
+    try {
+      const snap = await getDocs(collection(db, "artikel_hotel"));
+      artikelListRaw = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .filter((a) => a.aktiv)
+        .sort((a, b) => a.name.localeCompare(b.name, "de"));
+    } catch (err) {
+      console.error(err);
+    }
+
+    const artikelHtml = artikelListRaw.length === 0
+      ? `<p class="hint-text">Keine aktiven Artikel vorhanden. Bitte zuerst in den Einstellungen Artikel anlegen.</p>`
+      : artikelListRaw
+          .map(
+            (a) => `
+        <div class="list-row">
+          <span class="row-name">${escapeHtml(a.name)}</span>
+          <input type="number" min="0" step="1" placeholder="0" class="menge-input"
+                 data-artikel-id="${a.id}" data-artikel-name="${escapeHtml(a.name)}">
+        </div>`
+          )
+          .join("");
+
+    const minDate = tomorrowDateString();
+
+    container.innerHTML = `
+      <div class="card" style="padding:20px;">
+        ${bestellschlussErreicht ? `<div class="error-text" style="margin-bottom:14px;">Bestellschluss für heute erreicht – es kann aktuell keine Hotel/Restaurant-Bestellung mehr erstellt werden.</div>` : ""}
+        <form id="hf-form">
+          ${
+            role === "hotelrestaurant"
+              ? `<div class="field">
+                  <label>Hotel/Restaurant</label>
+                  <div class="static-value">${escapeHtml(ownHotelName || "–")}</div>
+                </div>`
+              : `<div class="field">
+                  <label for="hf-hotel-select">Hotel/Restaurant</label>
+                  <select id="hf-hotel-select" required>
+                    <option value="" disabled ${hotelOptions.length ? "selected" : ""}>Bitte wählen…</option>
+                    ${hotelOptions.map((h) => `<option value="${h.uid}">${escapeHtml(h.hotelName || h.name || h.uid)}</option>`).join("")}
+                  </select>
+                  ${hotelOptions.length === 0 ? `<p class="hint-text" style="margin-top:8px;">Keine Hotel/Restaurant-Accounts gefunden.</p>` : ""}
+                </div>`
+          }
+          <div class="field">
+            <label for="hf-liefertag">Liefertag</label>
+            <input type="date" id="hf-liefertag" min="${minDate}" value="${minDate}" required>
+          </div>
+          <div class="field">
+            <label>Artikel</label>
+            <div class="card" id="hf-artikel-liste">${artikelHtml}</div>
+          </div>
+          <div class="error-text" id="hf-error"></div>
+          <div id="hf-success" style="color:var(--color-success);font-size:13.5px;margin:-10px 0 14px;min-height:18px;"></div>
+          <button type="submit" class="btn btn-primary" id="hf-save-btn" style="width:100%;" ${bestellschlussErreicht ? "disabled" : ""}>
+            Bestellung speichern
+          </button>
+        </form>
+      </div>
+    `;
+
+    const form = container.querySelector("#hf-form");
+    const errorEl = container.querySelector("#hf-error");
+    const successEl = container.querySelector("#hf-success");
+    const saveBtn = container.querySelector("#hf-save-btn");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorEl.textContent = "";
+      successEl.textContent = "";
+
+      let hotelUid, hotelName;
+      if (role === "hotelrestaurant") {
+        hotelUid = uid;
+        hotelName = ownHotelName;
+      } else {
+        const select = container.querySelector("#hf-hotel-select");
+        hotelUid = select.value;
+        const match = hotelOptions.find((h) => h.uid === hotelUid);
+        hotelName = match ? match.hotelName : "";
+        if (!hotelUid) {
+          errorEl.textContent = "Bitte ein Hotel/Restaurant auswählen.";
+          return;
+        }
+      }
+
+      const liefertag = container.querySelector("#hf-liefertag").value;
+      if (!liefertag) {
+        errorEl.textContent = "Bitte einen Liefertag angeben.";
+        return;
+      }
+
+      const items = collectMengeItems(container);
+      if (items.length === 0) {
+        errorEl.textContent = "Bitte mindestens einen Artikel mit Menge grösser 0 angeben.";
+        return;
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Speichert …";
+
+      try {
+        await addDoc(collection(db, "bestellungen_hotel"), {
+          hotelUid,
+          hotelName: hotelName || "",
+          liefertag,
+          items,
+          status: "offen",
+          erstelltAm: serverTimestamp(),
+        });
+        successEl.textContent = "Bestellung gespeichert.";
+        container.querySelectorAll(".menge-input").forEach((inp) => { inp.value = ""; });
+      } catch (err) {
+        console.error(err);
+        errorEl.textContent = "Fehler beim Speichern. Bitte erneut versuchen.";
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Bestellung speichern";
+      }
+    });
+  }
+
+  const TYPE_META = {
+    abteilung: { label: "Abteilung", badgeClass: "type-abteilung" },
+    kunde: { label: "Kunde", badgeClass: "type-kunde" },
+    hotel: { label: "Hotel/Restaurant", badgeClass: "type-hotel" },
+  };
+  const STATUS_META = {
+    offen: { label: "Offen", cls: "status-offen" },
+    in_verarbeitung: { label: "In Verarbeitung", cls: "status-in_verarbeitung" },
+  };
+
+  // -----------------------------------------------------------------
+  // Bestellungen-Übersicht.
+  // Kombiniert bestellungen_abteilung / _kunde / _hotel in einer Liste mit
+  // Typ-Badge. Sichtbarkeit je Rolle folgt den Firestore Security Rules:
+  // admin/leitung sehen alles, abteilung sieht eigene Abteilungs-/Kunden-
+  // bestellungen + alle Hotelbestellungen, hotelrestaurant nur eigene.
+  // In dieser Schicht: nur ansehen + löschen (admin/leitung); Bearbeiten
+  // folgt später.
+  // -----------------------------------------------------------------
+  function initBestellungenUebersicht(container, { role, uid }) {
+    container.innerHTML = "";
+    const listEl = document.createElement("div");
+    container.appendChild(listEl);
+    listEl.innerHTML = `<div class="card placeholder-card"><p>Bestellungen werden geladen …</p></div>`;
+
+    let dataAbteilung = [];
+    let dataKunde = [];
+    let dataHotel = [];
+    const loaded = { abteilung: false, kunde: false, hotel: false };
+
+    function render() {
+      if (!loaded.abteilung || !loaded.kunde || !loaded.hotel) return;
+
+      const all = [
+        ...dataAbteilung.map((o) => ({ ...o, __typ: "abteilung", __coll: "bestellungen_abteilung" })),
+        ...dataKunde.map((o) => ({ ...o, __typ: "kunde", __coll: "bestellungen_kunde" })),
+        ...dataHotel.map((o) => ({ ...o, __typ: "hotel", __coll: "bestellungen_hotel" })),
+      ];
+
+      if (all.length === 0) {
+        listEl.innerHTML = `<div class="card placeholder-card"><p>Noch keine Bestellungen vorhanden.</p></div>`;
+        return;
+      }
+
+      all.sort((a, b) => (a.liefertag || "").localeCompare(b.liefertag || ""));
+
+      const canDelete = role === "admin" || role === "leitung";
+
+      listEl.innerHTML = all
+        .map((o) => {
+          const typMeta = TYPE_META[o.__typ];
+          const statusMeta = STATUS_META[o.status] || { label: o.status || "–", cls: "" };
+          let titleLine;
+          if (o.__typ === "abteilung") {
+            titleLine = o.abteilung === "dorfladen" ? "Dorfladen" : "Tearoom & Laden";
+          } else if (o.__typ === "kunde") {
+            titleLine = `${escapeHtml(o.kundenName || "–")} · ${o.liefermethode === "lieferung" ? "Lieferung" : "Abholung"}`;
+          } else {
+            titleLine = escapeHtml(o.hotelName || "–");
+          }
+          const itemsSummary = o.items && o.items.length
+            ? o.items.map((it) => `${escapeHtml(it.artikelName)} × ${it.menge}`).join(", ")
+            : "Keine Artikel";
+
+          return `
+            <div class="card" style="padding:14px 16px;margin-bottom:10px;">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+                <div style="min-width:0;">
+                  <span class="type-badge ${typMeta.badgeClass}">${typMeta.label}</span>
+                  <div style="font-weight:700;font-size:15px;margin-top:6px;">${titleLine}</div>
+                  <div class="hint-text" style="margin-top:2px;">Liefertag: ${o.liefertag ? formatDateDe(o.liefertag) : "–"}</div>
+                </div>
+                <span class="status-tag ${statusMeta.cls}">${statusMeta.label}</span>
+              </div>
+              <div class="hint-text" style="margin-top:10px;">${itemsSummary}</div>
+              ${canDelete ? `<button type="button" class="btn btn-danger" data-action="delete" data-coll="${o.__coll}" data-id="${o.id}" style="margin-top:12px;padding:8px 14px;font-size:13px;">Löschen</button>` : ""}
+            </div>
+          `;
+        })
+        .join("");
+    }
+
+    function watch(collName, filterField, matchesRole, key) {
+      const shouldSeeAll = role === "admin" || role === "leitung" || matchesRole === "all";
+      if (shouldSeeAll) {
+        onSnapshot(collection(db, collName), (snap) => {
+          if (key === "abteilung") dataAbteilung = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          if (key === "kunde") dataKunde = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          if (key === "hotel") dataHotel = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          loaded[key] = true;
+          render();
+        });
+      } else if (matchesRole === role && filterField) {
+        onSnapshot(query(collection(db, collName), where(filterField, "==", uid)), (snap) => {
+          if (key === "abteilung") dataAbteilung = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          if (key === "kunde") dataKunde = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          if (key === "hotel") dataHotel = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          loaded[key] = true;
+          render();
+        });
+      } else {
+        loaded[key] = true;
+        render();
+      }
+    }
+
+    // Abteilungsbestellungen: admin/leitung alles, abteilung nur eigene, hotelrestaurant nichts.
+    watch("bestellungen_abteilung", "erstelltVon", "abteilung", "abteilung");
+    // Kundenbestellungen: admin/leitung alles, abteilung nur eigene, hotelrestaurant nichts.
+    watch("bestellungen_kunde", "erstelltVon", "abteilung", "kunde");
+    // Hotelbestellungen: admin/leitung + abteilung sehen alles, hotelrestaurant nur eigene.
+    if (role === "hotelrestaurant") {
+      onSnapshot(query(collection(db, "bestellungen_hotel"), where("hotelUid", "==", uid)), (snap) => {
+        dataHotel = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        loaded.hotel = true;
+        render();
+      });
+    } else {
+      watch("bestellungen_hotel", null, "all", "hotel");
+    }
+
+    listEl.addEventListener("click", async (e) => {
+      const btn = e.target.closest('[data-action="delete"]');
+      if (!btn) return;
+      if (!confirm("Soll diese Bestellung wirklich gelöscht werden?")) return;
+      try {
+        await deleteDoc(doc(db, btn.dataset.coll, btn.dataset.id));
+      } catch (err) {
+        console.error(err);
+        alert("Fehler beim Löschen. Bitte erneut versuchen.");
+      }
+    });
+  }
+
   function renderSubtabView(containerId, subtabs, contentPrefix, customRenderers = {}) {
     const container = document.getElementById(containerId);
     const nav = document.createElement("div");
@@ -1191,6 +1508,7 @@
         renderSubtabView(`view-${tab.id}`, ERSTELLEN_SUBTABS, "erstellen", {
           "abteilung": (panel) => initAbteilungsbestellungForm(panel, { role, uid }),
           "kunde": (panel) => initKundenbestellungForm(panel, { role, uid }),
+          "hotel": (panel) => initHotelbestellungForm(panel, { role, uid }),
         });
       } else if (tab.id === "einstellungen") {
         main.appendChild(view);
@@ -1199,6 +1517,11 @@
           "artikel-hotel": initArtikelHotelPanel,
           "bestellschluss": initBestellschlussPanel,
         });
+      } else if (tab.id === "bestellungen") {
+        const body = document.createElement("div");
+        view.appendChild(body);
+        main.appendChild(view);
+        initBestellungenUebersicht(body, { role, uid });
       } else if (tab.id === "neu-abteilung") {
         const body = document.createElement("div");
         view.appendChild(body);
@@ -1209,6 +1532,11 @@
         view.appendChild(body);
         main.appendChild(view);
         initKundenbestellungForm(body, { role, uid });
+      } else if (tab.id === "neu-hotel" || tab.id === "neu") {
+        const body = document.createElement("div");
+        view.appendChild(body);
+        main.appendChild(view);
+        initHotelbestellungForm(body, { role, uid });
       } else {
         const body = document.createElement("div");
         body.innerHTML = placeholderCard(VIEW_PLACEHOLDERS[tab.id] || "Kommt in einer späteren Schicht.");
