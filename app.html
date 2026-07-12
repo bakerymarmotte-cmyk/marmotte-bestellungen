@@ -329,7 +329,6 @@
     <div class="user-box">
       <div class="user-meta">
         <div class="name" id="user-name">–</div>
-        <div class="role" id="user-role">–</div>
       </div>
       <button type="button" class="logout-btn" id="logout-btn">Abmelden</button>
     </div>
@@ -1570,7 +1569,6 @@
     const tabs = TABS_BY_ROLE[role] || TABS_BY_ROLE.abteilung;
 
     document.getElementById("user-name").textContent = name || "–";
-    document.getElementById("user-role").textContent = ROLE_LABELS[role] || role;
 
     buildViews(tabs, role, uid);
     buildTabbar(tabs);
