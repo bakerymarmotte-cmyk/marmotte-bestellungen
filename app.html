@@ -791,6 +791,87 @@
   }
 
   // -----------------------------------------------------------------
+  // Wiederverwendbare Artikel-Auswahl (Abteilung + Kunde teilen sich die
+  // gleiche Artikelliste artikel_abteilung, gruppiert nach artikel_gruppen).
+  // -----------------------------------------------------------------
+  async function loadArtikelAbteilungGrouped() {
+    const [artikelSnap, gruppenSnap] = await Promise.all([
+      getDocs(collection(db, "artikel_abteilung")),
+      getDocs(collection(db, "artikel_gruppen")),
+    ]);
+    const artikelListRaw = artikelSnap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((a) => a.aktiv);
+    const gruppen = gruppenSnap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (a.sortierung || 0) - (b.sortierung || 0));
+    return { artikelListRaw, gruppen };
+  }
+
+  function renderArtikelAuswahlHtml(artikelListRaw, gruppen) {
+    if (artikelListRaw.length === 0) {
+      return `<p class="hint-text">Keine aktiven Artikel vorhanden. Bitte zuerst in den Einstellungen Artikel anlegen.</p>`;
+    }
+    const byGroup = {};
+    artikelListRaw.forEach((a) => {
+      const g = a.gruppe || "Ohne Gruppe";
+      (byGroup[g] = byGroup[g] || []).push(a);
+    });
+    const knownOrder = gruppen.map((g) => g.name);
+    const extraGroups = Object.keys(byGroup).filter((g) => !knownOrder.includes(g));
+    const groupOrder = [...knownOrder, ...extraGroups].filter((g) => byGroup[g]);
+
+    return groupOrder
+      .map((g) => {
+        const rows = byGroup[g]
+          .slice()
+          .sort((a, b) => (a.sortierung || 0) - (b.sortierung || 0))
+          .map(
+            (a) => `
+          <div class="list-row">
+            <span class="row-name">${escapeHtml(a.name)}</span>
+            <input type="number" min="0" step="1" placeholder="0" class="menge-input"
+                   data-artikel-id="${a.id}" data-artikel-name="${escapeHtml(a.name)}">
+          </div>`
+          )
+          .join("");
+        return `<div class="group-header">${escapeHtml(g)}</div>${rows}`;
+      })
+      .join("");
+  }
+
+  function collectMengeItems(container) {
+    const items = [];
+    container.querySelectorAll(".menge-input").forEach((inp) => {
+      const menge = parseInt(inp.value, 10);
+      if (menge > 0) {
+        items.push({ artikelId: inp.dataset.artikelId, artikelName: inp.dataset.artikelName, menge });
+      }
+    });
+    return items;
+  }
+
+  function todayDateString() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
+  async function isBestellschlussErreicht(typ) {
+    try {
+      const bsSnap = await getDoc(doc(db, "einstellungen", "bestellschluss"));
+      if (bsSnap.exists() && typeof bsSnap.data()[typ] === "number") {
+        const now = new Date();
+        const nowUtcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+        return nowUtcMinutes >= bsSnap.data()[typ];
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    return false;
+  }
+
+  // -----------------------------------------------------------------
   // Datums-Helfer: Abteilungsbestellungen sind immer "heute auf morgen".
   // -----------------------------------------------------------------
   function tomorrowDateString() {
@@ -815,17 +896,7 @@
   async function initAbteilungsbestellungForm(container, { role, uid }) {
     container.innerHTML = `<div class="card placeholder-card"><p>Formular wird geladen …</p></div>`;
 
-    let bestellschlussErreicht = false;
-    try {
-      const bsSnap = await getDoc(doc(db, "einstellungen", "bestellschluss"));
-      if (bsSnap.exists() && typeof bsSnap.data().abteilung === "number") {
-        const now = new Date();
-        const nowUtcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
-        bestellschlussErreicht = nowUtcMinutes >= bsSnap.data().abteilung;
-      }
-    } catch (err) {
-      console.error(err);
-    }
+    const bestellschlussErreicht = await isBestellschlussErreicht("abteilung");
 
     let ownAbteilung = null;
     if (role === "abteilung") {
@@ -837,49 +908,8 @@
       }
     }
 
-    let artikelListRaw = [];
-    let gruppen = [];
-    try {
-      const [artikelSnap, gruppenSnap] = await Promise.all([
-        getDocs(collection(db, "artikel_abteilung")),
-        getDocs(collection(db, "artikel_gruppen")),
-      ]);
-      artikelListRaw = artikelSnap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((a) => a.aktiv);
-      gruppen = gruppenSnap.docs
-        .map((d) => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => (a.sortierung || 0) - (b.sortierung || 0));
-    } catch (err) {
-      console.error(err);
-    }
-
-    const byGroup = {};
-    artikelListRaw.forEach((a) => {
-      const g = a.gruppe || "Ohne Gruppe";
-      (byGroup[g] = byGroup[g] || []).push(a);
-    });
-    const knownOrder = gruppen.map((g) => g.name);
-    const extraGroups = Object.keys(byGroup).filter((g) => !knownOrder.includes(g));
-    const groupOrder = [...knownOrder, ...extraGroups].filter((g) => byGroup[g]);
-
-    const artikelHtml = artikelListRaw.length === 0
-      ? `<p class="hint-text">Keine aktiven Artikel vorhanden. Bitte zuerst in den Einstellungen Artikel anlegen.</p>`
-      : groupOrder
-          .map((g) => {
-            const rows = byGroup[g]
-              .slice()
-              .sort((a, b) => (a.sortierung || 0) - (b.sortierung || 0))
-              .map(
-                (a) => `
-              <div class="list-row">
-                <span class="row-name">${escapeHtml(a.name)}</span>
-                <input type="number" min="0" step="1" placeholder="0" class="menge-input"
-                       data-artikel-id="${a.id}" data-artikel-name="${escapeHtml(a.name)}">
-              </div>`
-              )
-              .join("");
-            return `<div class="group-header">${escapeHtml(g)}</div>${rows}`;
-          })
-          .join("");
+    const { artikelListRaw, gruppen } = await loadArtikelAbteilungGrouped();
+    const artikelHtml = renderArtikelAuswahlHtml(artikelListRaw, gruppen);
 
     container.innerHTML = `
       <div class="card" style="padding:20px;">
@@ -935,14 +965,7 @@
         return;
       }
 
-      const items = [];
-      container.querySelectorAll(".menge-input").forEach((inp) => {
-        const menge = parseInt(inp.value, 10);
-        if (menge > 0) {
-          items.push({ artikelId: inp.dataset.artikelId, artikelName: inp.dataset.artikelName, menge });
-        }
-      });
-
+      const items = collectMengeItems(container);
       if (items.length === 0) {
         errorEl.textContent = "Bitte mindestens einen Artikel mit Menge grösser 0 angeben.";
         return;
@@ -962,6 +985,149 @@
         });
         successEl.textContent = "Bestellung gespeichert.";
         container.querySelectorAll(".menge-input").forEach((inp) => { inp.value = ""; });
+      } catch (err) {
+        console.error(err);
+        errorEl.textContent = "Fehler beim Speichern. Bitte erneut versuchen.";
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Bestellung speichern";
+      }
+    });
+  }
+
+  // -----------------------------------------------------------------
+  // Kundenbestellung erstellen.
+  // Wird von Rolle 'abteilung' (Kunde ruft an/mailt/steht im Laden) und von
+  // admin/leitung erfasst. Teilt sich die Artikelliste mit der Abteilung.
+  // -----------------------------------------------------------------
+  async function initKundenbestellungForm(container, { role, uid }) {
+    container.innerHTML = `<div class="card placeholder-card"><p>Formular wird geladen …</p></div>`;
+
+    const bestellschlussErreicht = await isBestellschlussErreicht("kunde");
+    const { artikelListRaw, gruppen } = await loadArtikelAbteilungGrouped();
+    const artikelHtml = renderArtikelAuswahlHtml(artikelListRaw, gruppen);
+    const todayStr = todayDateString();
+
+    container.innerHTML = `
+      <div class="card" style="padding:20px;">
+        ${bestellschlussErreicht ? `<div class="error-text" style="margin-bottom:14px;">Bestellschluss für heute erreicht – es können aktuell keine neuen Kundenbestellungen erstellt werden.</div>` : ""}
+        <form id="kf-form">
+          <div class="field">
+            <label for="kf-kundenname">Kundenname</label>
+            <input type="text" id="kf-kundenname" required>
+          </div>
+          <div class="field">
+            <label for="kf-liefertag">Liefertag</label>
+            <input type="date" id="kf-liefertag" min="${todayStr}" value="${todayStr}" required>
+          </div>
+          <div class="field">
+            <label for="kf-liefermethode">Liefermethode</label>
+            <select id="kf-liefermethode">
+              <option value="abholung">Abholung</option>
+              <option value="lieferung">Lieferung</option>
+            </select>
+          </div>
+          <div id="kf-lieferfelder" style="display:none;">
+            <div class="field">
+              <label for="kf-adresse">Rechnungsadresse</label>
+              <textarea id="kf-adresse" rows="3" style="width:100%;background:var(--color-surface-raised);border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:12px 14px;color:var(--color-text);font-size:15px;font-family:var(--font-body);resize:vertical;"></textarea>
+            </div>
+            <div class="field">
+              <label for="kf-telefon">Telefon</label>
+              <input type="tel" id="kf-telefon">
+            </div>
+            <div class="field">
+              <label for="kf-email">E-Mail</label>
+              <input type="email" id="kf-email">
+            </div>
+          </div>
+          <div class="field">
+            <label>Artikel</label>
+            <div class="card" id="kf-artikel-liste">${artikelHtml}</div>
+          </div>
+          <div class="error-text" id="kf-error"></div>
+          <div id="kf-success" style="color:var(--color-success);font-size:13.5px;margin:-10px 0 14px;min-height:18px;"></div>
+          <button type="submit" class="btn btn-primary" id="kf-save-btn" style="width:100%;" ${bestellschlussErreicht ? "disabled" : ""}>
+            Bestellung speichern
+          </button>
+        </form>
+      </div>
+    `;
+
+    const form = container.querySelector("#kf-form");
+    const methodeSelect = container.querySelector("#kf-liefermethode");
+    const lieferfelder = container.querySelector("#kf-lieferfelder");
+    const errorEl = container.querySelector("#kf-error");
+    const successEl = container.querySelector("#kf-success");
+    const saveBtn = container.querySelector("#kf-save-btn");
+
+    methodeSelect.addEventListener("change", () => {
+      lieferfelder.style.display = methodeSelect.value === "lieferung" ? "block" : "none";
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorEl.textContent = "";
+      successEl.textContent = "";
+
+      const kundenName = container.querySelector("#kf-kundenname").value.trim();
+      const liefertag = container.querySelector("#kf-liefertag").value;
+      const liefermethode = methodeSelect.value;
+
+      if (!kundenName) {
+        errorEl.textContent = "Bitte einen Kundennamen angeben.";
+        return;
+      }
+      if (!liefertag) {
+        errorEl.textContent = "Bitte einen Liefertag angeben.";
+        return;
+      }
+
+      let rechnungsadresse = "", telefon = "", email = "";
+      if (liefermethode === "lieferung") {
+        rechnungsadresse = container.querySelector("#kf-adresse").value.trim();
+        telefon = container.querySelector("#kf-telefon").value.trim();
+        email = container.querySelector("#kf-email").value.trim();
+        if (!rechnungsadresse) {
+          errorEl.textContent = "Bitte eine Rechnungsadresse angeben.";
+          return;
+        }
+        if (!telefon && !email) {
+          errorEl.textContent = "Bitte Telefon oder E-Mail angeben.";
+          return;
+        }
+      }
+
+      const items = collectMengeItems(container);
+      if (items.length === 0) {
+        errorEl.textContent = "Bitte mindestens einen Artikel mit Menge grösser 0 angeben.";
+        return;
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Speichert …";
+
+      try {
+        const payload = {
+          kundenName,
+          liefertag,
+          liefermethode,
+          items,
+          status: "offen",
+          erstelltVon: uid,
+          erstelltAm: serverTimestamp(),
+        };
+        if (liefermethode === "lieferung") {
+          payload.rechnungsadresse = rechnungsadresse;
+          payload.telefon = telefon;
+          payload.email = email;
+        }
+        await addDoc(collection(db, "bestellungen_kunde"), payload);
+        successEl.textContent = "Bestellung gespeichert.";
+        form.reset();
+        lieferfelder.style.display = "none";
+        container.querySelectorAll(".menge-input").forEach((inp) => { inp.value = ""; });
+        container.querySelector("#kf-liefertag").value = todayStr;
       } catch (err) {
         console.error(err);
         errorEl.textContent = "Fehler beim Speichern. Bitte erneut versuchen.";
@@ -1024,6 +1190,7 @@
         main.appendChild(view);
         renderSubtabView(`view-${tab.id}`, ERSTELLEN_SUBTABS, "erstellen", {
           "abteilung": (panel) => initAbteilungsbestellungForm(panel, { role, uid }),
+          "kunde": (panel) => initKundenbestellungForm(panel, { role, uid }),
         });
       } else if (tab.id === "einstellungen") {
         main.appendChild(view);
@@ -1037,6 +1204,11 @@
         view.appendChild(body);
         main.appendChild(view);
         initAbteilungsbestellungForm(body, { role, uid });
+      } else if (tab.id === "neu-kunde") {
+        const body = document.createElement("div");
+        view.appendChild(body);
+        main.appendChild(view);
+        initKundenbestellungForm(body, { role, uid });
       } else {
         const body = document.createElement("div");
         body.innerHTML = placeholderCard(VIEW_PLACEHOLDERS[tab.id] || "Kommt in einer späteren Schicht.");
