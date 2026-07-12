@@ -174,6 +174,100 @@
     color: var(--color-text-muted);
     font-size: 14px;
   }
+
+  /* ---------- Verwaltung (Gruppen/Artikel) ---------- */
+  .mgmt-section { margin-bottom: 28px; }
+  .mgmt-section h3 {
+    font-size: 12.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--color-text-muted);
+    margin: 0 0 12px;
+  }
+  .inline-form {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .inline-form input, .inline-form select {
+    flex: 1;
+    min-width: 140px;
+    background: var(--color-surface-raised);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 11px 12px;
+    color: var(--color-text);
+    font-size: 14px;
+    font-family: var(--font-body);
+  }
+  .inline-form input:focus, .inline-form select:focus { outline: none; border-color: var(--color-yellow); }
+  .inline-form .btn { flex: none; padding: 11px 16px; font-size: 13.5px; }
+
+  .list-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .list-row:last-child { border-bottom: none; }
+  .list-row .row-name {
+    flex: 1;
+    font-size: 14px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .list-row .row-name input {
+    width: 100%;
+    background: var(--color-surface-raised);
+    border: 1px solid var(--color-yellow);
+    border-radius: 6px;
+    padding: 6px 8px;
+    color: var(--color-text);
+    font-size: 14px;
+    font-family: var(--font-body);
+  }
+  .row-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+  .icon-btn {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    border-radius: 6px;
+    width: 30px;
+    height: 30px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .icon-btn:hover { border-color: var(--color-yellow); color: var(--color-yellow); }
+  .icon-btn.danger:hover { border-color: rgba(229, 72, 77, 0.5); color: var(--color-danger); }
+  .toggle-btn {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .toggle-btn.active {
+    background: rgba(76, 175, 125, 0.15);
+    border-color: var(--color-success);
+    color: var(--color-success);
+  }
+  .group-header {
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--color-yellow);
+    padding: 12px 14px 6px;
+  }
+  .group-header:first-child { padding-top: 4px; }
 </style>
 </head>
 <body>
@@ -204,7 +298,9 @@
 <script type="module">
   import { auth, db } from "./firebase-config.js";
   import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-  import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import {
+    doc, getDoc, collection, addDoc, updateDoc, deleteDoc, onSnapshot,
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   // ---------------------------------------------------------------------
   // Tab-Konfiguration je Rolle.
@@ -274,7 +370,287 @@
     `;
   }
 
-  function renderSubtabView(containerId, subtabs, contentPrefix) {
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str == null ? "" : String(str);
+    return div.innerHTML;
+  }
+
+  function nextSortValue(list) {
+    if (!list.length) return 0;
+    return Math.max(...list.map((item) => item.sortierung || 0)) + 1;
+  }
+
+  // -----------------------------------------------------------------
+  // Einstellungen > Artikel Abteilung/Kunde
+  // Verwaltet zwei Collections: artikel_gruppen (name, sortierung)
+  // und artikel_abteilung (name, aktiv, gruppe, sortierung).
+  // -----------------------------------------------------------------
+  function initArtikelAbteilungPanel(panel) {
+    panel.innerHTML = `
+      <div class="mgmt-section">
+        <h3>Gruppen</h3>
+        <form class="inline-form" id="gruppe-form">
+          <input type="text" id="gruppe-name-input" placeholder="Neue Gruppe…" required>
+          <button type="submit" class="btn btn-secondary">Hinzufügen</button>
+        </form>
+        <div class="card" id="gruppen-list"></div>
+      </div>
+      <div class="mgmt-section">
+        <h3>Artikel</h3>
+        <form class="inline-form" id="artikel-form">
+          <input type="text" id="artikel-name-input" placeholder="Artikelname…" required>
+          <select id="artikel-gruppe-select" required></select>
+          <button type="submit" class="btn btn-secondary">Hinzufügen</button>
+        </form>
+        <div class="card" id="artikel-list"></div>
+      </div>
+    `;
+
+    let gruppen = [];
+    let artikel = [];
+
+    const gruppenListEl = panel.querySelector("#gruppen-list");
+    const artikelListEl = panel.querySelector("#artikel-list");
+    const gruppeSelect = panel.querySelector("#artikel-gruppe-select");
+
+    function renderGruppen() {
+      if (!gruppen.length) {
+        gruppenListEl.innerHTML = `<div class="list-row"><span class="hint-text">Noch keine Gruppen angelegt.</span></div>`;
+      } else {
+        gruppenListEl.innerHTML = gruppen
+          .map(
+            (g) => `
+          <div class="list-row" data-id="${g.id}">
+            <span class="row-name" data-role="display">${escapeHtml(g.name)}</span>
+            <div class="row-actions">
+              <button type="button" class="icon-btn" data-action="edit" title="Umbenennen">✎</button>
+              <button type="button" class="icon-btn danger" data-action="delete" title="Löschen">🗑</button>
+            </div>
+          </div>`
+          )
+          .join("");
+      }
+      gruppeSelect.innerHTML = gruppen
+        .map((g) => `<option value="${escapeHtml(g.name)}">${escapeHtml(g.name)}</option>`)
+        .join("");
+    }
+
+    function renderArtikel() {
+      if (!artikel.length) {
+        artikelListEl.innerHTML = `<div class="list-row"><span class="hint-text">Noch keine Artikel angelegt.</span></div>`;
+        return;
+      }
+      const byGroup = {};
+      artikel.forEach((a) => {
+        const g = a.gruppe || "Ohne Gruppe";
+        (byGroup[g] = byGroup[g] || []).push(a);
+      });
+      const knownOrder = gruppen.map((g) => g.name);
+      const extraGroups = Object.keys(byGroup).filter((g) => !knownOrder.includes(g));
+      const groupOrder = [...knownOrder, ...extraGroups].filter((g) => byGroup[g]);
+
+      artikelListEl.innerHTML = groupOrder
+        .map((g) => {
+          const rows = byGroup[g]
+            .slice()
+            .sort((a, b) => (a.sortierung || 0) - (b.sortierung || 0))
+            .map(
+              (a) => `
+            <div class="list-row" data-id="${a.id}">
+              <span class="row-name" data-role="display">${escapeHtml(a.name)}</span>
+              <div class="row-actions">
+                <button type="button" class="toggle-btn ${a.aktiv ? "active" : ""}" data-action="toggle">${a.aktiv ? "Aktiv" : "Inaktiv"}</button>
+                <button type="button" class="icon-btn" data-action="edit" title="Umbenennen">✎</button>
+                <button type="button" class="icon-btn danger" data-action="delete" title="Löschen">🗑</button>
+              </div>
+            </div>`
+            )
+            .join("");
+          return `<div class="group-header">${escapeHtml(g)}</div>${rows}`;
+        })
+        .join("");
+    }
+
+    onSnapshot(collection(db, "artikel_gruppen"), (snap) => {
+      gruppen = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (a.sortierung || 0) - (b.sortierung || 0));
+      renderGruppen();
+      renderArtikel();
+    });
+
+    onSnapshot(collection(db, "artikel_abteilung"), (snap) => {
+      artikel = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      renderArtikel();
+    });
+
+    panel.querySelector("#gruppe-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const input = panel.querySelector("#gruppe-name-input");
+      const name = input.value.trim();
+      if (!name) return;
+      await addDoc(collection(db, "artikel_gruppen"), {
+        name,
+        sortierung: nextSortValue(gruppen),
+      });
+      input.value = "";
+    });
+
+    panel.querySelector("#artikel-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const nameInput = panel.querySelector("#artikel-name-input");
+      const name = nameInput.value.trim();
+      const gruppe = gruppeSelect.value;
+      if (!name || !gruppe) return;
+      const sortierung = nextSortValue(artikel.filter((a) => a.gruppe === gruppe));
+      await addDoc(collection(db, "artikel_abteilung"), {
+        name,
+        aktiv: true,
+        gruppe,
+        sortierung,
+      });
+      nameInput.value = "";
+    });
+
+    gruppenListEl.addEventListener("click", (e) => handleRowAction(e, "artikel_gruppen", gruppen));
+    artikelListEl.addEventListener("click", (e) => handleRowAction(e, "artikel_abteilung", artikel));
+
+    async function handleRowAction(e, collectionName, sourceList) {
+      const actionBtn = e.target.closest("[data-action]");
+      if (!actionBtn) return;
+      const row = e.target.closest(".list-row");
+      const id = row?.dataset.id;
+      if (!id) return;
+      const action = actionBtn.dataset.action;
+      const item = sourceList.find((i) => i.id === id);
+
+      if (action === "delete") {
+        const label = collectionName === "artikel_gruppen" ? "diese Gruppe" : "diesen Artikel";
+        if (!confirm(`Soll ${label} wirklich gelöscht werden?`)) return;
+        await deleteDoc(doc(db, collectionName, id));
+      } else if (action === "toggle") {
+        await updateDoc(doc(db, collectionName, id), { aktiv: !item.aktiv });
+      } else if (action === "edit") {
+        const nameEl = row.querySelector('[data-role="display"]');
+        const currentName = item ? item.name : nameEl.textContent;
+        nameEl.innerHTML = `<input type="text" value="${escapeHtml(currentName)}">`;
+        const editInput = nameEl.querySelector("input");
+        editInput.focus();
+        editInput.select();
+
+        const commit = async () => {
+          const newName = editInput.value.trim();
+          if (newName && newName !== currentName) {
+            await updateDoc(doc(db, collectionName, id), { name: newName });
+          } else {
+            nameEl.textContent = currentName;
+          }
+        };
+        editInput.addEventListener("blur", commit);
+        editInput.addEventListener("keydown", (ev) => {
+          if (ev.key === "Enter") editInput.blur();
+          if (ev.key === "Escape") { nameEl.textContent = currentName; }
+        });
+      }
+    }
+  }
+
+  // -----------------------------------------------------------------
+  // Einstellungen > Artikel Hotel/Restaurant
+  // Eigene, ungruppierte Collection artikel_hotel (name, aktiv),
+  // alphabetisch sortiert.
+  // -----------------------------------------------------------------
+  function initArtikelHotelPanel(panel) {
+    panel.innerHTML = `
+      <div class="mgmt-section">
+        <h3>Artikel Hotel/Restaurant</h3>
+        <form class="inline-form" id="hotel-artikel-form">
+          <input type="text" id="hotel-artikel-name-input" placeholder="Artikelname…" required>
+          <button type="submit" class="btn btn-secondary">Hinzufügen</button>
+        </form>
+        <div class="card" id="hotel-artikel-list"></div>
+      </div>
+    `;
+
+    let artikel = [];
+    const listEl = panel.querySelector("#hotel-artikel-list");
+
+    function render() {
+      if (!artikel.length) {
+        listEl.innerHTML = `<div class="list-row"><span class="hint-text">Noch keine Artikel angelegt.</span></div>`;
+        return;
+      }
+      const sorted = artikel.slice().sort((a, b) => a.name.localeCompare(b.name, "de"));
+      listEl.innerHTML = sorted
+        .map(
+          (a) => `
+        <div class="list-row" data-id="${a.id}">
+          <span class="row-name" data-role="display">${escapeHtml(a.name)}</span>
+          <div class="row-actions">
+            <button type="button" class="toggle-btn ${a.aktiv ? "active" : ""}" data-action="toggle">${a.aktiv ? "Aktiv" : "Inaktiv"}</button>
+            <button type="button" class="icon-btn" data-action="edit" title="Umbenennen">✎</button>
+            <button type="button" class="icon-btn danger" data-action="delete" title="Löschen">🗑</button>
+          </div>
+        </div>`
+        )
+        .join("");
+    }
+
+    onSnapshot(collection(db, "artikel_hotel"), (snap) => {
+      artikel = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      render();
+    });
+
+    panel.querySelector("#hotel-artikel-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const input = panel.querySelector("#hotel-artikel-name-input");
+      const name = input.value.trim();
+      if (!name) return;
+      await addDoc(collection(db, "artikel_hotel"), { name, aktiv: true });
+      input.value = "";
+    });
+
+    listEl.addEventListener("click", async (e) => {
+      const actionBtn = e.target.closest("[data-action]");
+      if (!actionBtn) return;
+      const row = e.target.closest(".list-row");
+      const id = row?.dataset.id;
+      if (!id) return;
+      const action = actionBtn.dataset.action;
+      const item = artikel.find((i) => i.id === id);
+
+      if (action === "delete") {
+        if (!confirm("Soll dieser Artikel wirklich gelöscht werden?")) return;
+        await deleteDoc(doc(db, "artikel_hotel", id));
+      } else if (action === "toggle") {
+        await updateDoc(doc(db, "artikel_hotel", id), { aktiv: !item.aktiv });
+      } else if (action === "edit") {
+        const nameEl = row.querySelector('[data-role="display"]');
+        const currentName = item ? item.name : nameEl.textContent;
+        nameEl.innerHTML = `<input type="text" value="${escapeHtml(currentName)}">`;
+        const editInput = nameEl.querySelector("input");
+        editInput.focus();
+        editInput.select();
+
+        const commit = async () => {
+          const newName = editInput.value.trim();
+          if (newName && newName !== currentName) {
+            await updateDoc(doc(db, "artikel_hotel", id), { name: newName });
+          } else {
+            nameEl.textContent = currentName;
+          }
+        };
+        editInput.addEventListener("blur", commit);
+        editInput.addEventListener("keydown", (ev) => {
+          if (ev.key === "Enter") editInput.blur();
+          if (ev.key === "Escape") { nameEl.textContent = currentName; }
+        });
+      }
+    });
+  }
+
+  function renderSubtabView(containerId, subtabs, contentPrefix, customRenderers = {}) {
     const container = document.getElementById(containerId);
     const nav = document.createElement("div");
     nav.className = "subtabs";
@@ -299,7 +675,11 @@
       panel.className = "subtab-panel";
       panel.id = `${contentPrefix}-${st.id}`;
       panel.style.display = i === 0 ? "block" : "none";
-      panel.innerHTML = placeholderCard(`${st.label} – wird in Schicht 2 gebaut.`);
+      if (customRenderers[st.id]) {
+        customRenderers[st.id](panel);
+      } else {
+        panel.innerHTML = placeholderCard(`${st.label} – wird in Schicht 2 gebaut.`);
+      }
       container.appendChild(panel);
     });
   }
@@ -323,7 +703,10 @@
         renderSubtabView(`view-${tab.id}`, ERSTELLEN_SUBTABS, "erstellen");
       } else if (tab.id === "einstellungen") {
         main.appendChild(view);
-        renderSubtabView(`view-${tab.id}`, EINSTELLUNGEN_SUBTABS, "einstellungen");
+        renderSubtabView(`view-${tab.id}`, EINSTELLUNGEN_SUBTABS, "einstellungen", {
+          "artikel-abteilung": initArtikelAbteilungPanel,
+          "artikel-hotel": initArtikelHotelPanel,
+        });
       } else {
         const body = document.createElement("div");
         body.innerHTML = placeholderCard(VIEW_PLACEHOLDERS[tab.id] || "Kommt in einer späteren Schicht.");
