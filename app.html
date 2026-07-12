@@ -268,6 +268,28 @@
     padding: 12px 14px 6px;
   }
   .group-header:first-child { padding-top: 4px; }
+
+  .menge-input {
+    width: 64px;
+    text-align: center;
+    background: var(--color-surface-raised);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    padding: 8px 6px;
+    color: var(--color-text);
+    font-size: 14px;
+    font-family: var(--font-body);
+    flex: none;
+  }
+  .menge-input:focus { outline: none; border-color: var(--color-yellow); }
+
+  .static-value {
+    padding: 12px 14px;
+    background: var(--color-surface-raised);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: 15px;
+  }
 </style>
 </head>
 <body>
@@ -299,7 +321,8 @@
   import { auth, db } from "./firebase-config.js";
   import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import {
-    doc, getDoc, setDoc, collection, addDoc, updateDoc, deleteDoc, onSnapshot,
+    doc, getDoc, getDocs, setDoc, collection, addDoc, updateDoc, deleteDoc,
+    onSnapshot, serverTimestamp,
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   // ---------------------------------------------------------------------
@@ -767,6 +790,188 @@
     });
   }
 
+  // -----------------------------------------------------------------
+  // Datums-Helfer: Abteilungsbestellungen sind immer "heute auf morgen".
+  // -----------------------------------------------------------------
+  function tomorrowDateString() {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
+  function formatDateDe(isoDateStr) {
+    const [y, m, d] = isoDateStr.split("-");
+    return `${d}.${m}.${y}`;
+  }
+
+  // -----------------------------------------------------------------
+  // Abteilungsbestellung erstellen.
+  // Wird sowohl von Rolle 'abteilung' (eigene Abteilung fix) als auch von
+  // admin/leitung (Abteilung per Dropdown wählbar) verwendet.
+  // -----------------------------------------------------------------
+  async function initAbteilungsbestellungForm(container, { role, uid }) {
+    container.innerHTML = `<div class="card placeholder-card"><p>Formular wird geladen …</p></div>`;
+
+    let bestellschlussErreicht = false;
+    try {
+      const bsSnap = await getDoc(doc(db, "einstellungen", "bestellschluss"));
+      if (bsSnap.exists() && typeof bsSnap.data().abteilung === "number") {
+        const now = new Date();
+        const nowUtcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+        bestellschlussErreicht = nowUtcMinutes >= bsSnap.data().abteilung;
+      }
+    } catch (err) {
+      console.error(err);
+    }
+
+    let ownAbteilung = null;
+    if (role === "abteilung") {
+      try {
+        const userSnap = await getDoc(doc(db, "users", uid));
+        ownAbteilung = userSnap.exists() ? userSnap.data().abteilung : null;
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    let artikelListRaw = [];
+    let gruppen = [];
+    try {
+      const [artikelSnap, gruppenSnap] = await Promise.all([
+        getDocs(collection(db, "artikel_abteilung")),
+        getDocs(collection(db, "artikel_gruppen")),
+      ]);
+      artikelListRaw = artikelSnap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((a) => a.aktiv);
+      gruppen = gruppenSnap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (a.sortierung || 0) - (b.sortierung || 0));
+    } catch (err) {
+      console.error(err);
+    }
+
+    const byGroup = {};
+    artikelListRaw.forEach((a) => {
+      const g = a.gruppe || "Ohne Gruppe";
+      (byGroup[g] = byGroup[g] || []).push(a);
+    });
+    const knownOrder = gruppen.map((g) => g.name);
+    const extraGroups = Object.keys(byGroup).filter((g) => !knownOrder.includes(g));
+    const groupOrder = [...knownOrder, ...extraGroups].filter((g) => byGroup[g]);
+
+    const artikelHtml = artikelListRaw.length === 0
+      ? `<p class="hint-text">Keine aktiven Artikel vorhanden. Bitte zuerst in den Einstellungen Artikel anlegen.</p>`
+      : groupOrder
+          .map((g) => {
+            const rows = byGroup[g]
+              .slice()
+              .sort((a, b) => (a.sortierung || 0) - (b.sortierung || 0))
+              .map(
+                (a) => `
+              <div class="list-row">
+                <span class="row-name">${escapeHtml(a.name)}</span>
+                <input type="number" min="0" step="1" placeholder="0" class="menge-input"
+                       data-artikel-id="${a.id}" data-artikel-name="${escapeHtml(a.name)}">
+              </div>`
+              )
+              .join("");
+            return `<div class="group-header">${escapeHtml(g)}</div>${rows}`;
+          })
+          .join("");
+
+    container.innerHTML = `
+      <div class="card" style="padding:20px;">
+        ${bestellschlussErreicht ? `<div class="error-text" style="margin-bottom:14px;">Bestellschluss für heute erreicht – es kann aktuell keine Abteilungsbestellung mehr erstellt werden.</div>` : ""}
+        <form id="af-form">
+          <div class="field">
+            <label>Lieferung</label>
+            <div class="static-value">Morgen, ${formatDateDe(tomorrowDateString())}</div>
+          </div>
+          ${
+            role === "abteilung"
+              ? `<div class="field">
+                  <label>Abteilung</label>
+                  <div class="static-value">${ownAbteilung === "dorfladen" ? "Dorfladen" : "Tearoom & Laden"}</div>
+                </div>`
+              : `<div class="field">
+                  <label for="af-abteilung-select">Abteilung</label>
+                  <select id="af-abteilung-select" required>
+                    <option value="tearoom_laden">Tearoom &amp; Laden</option>
+                    <option value="dorfladen">Dorfladen</option>
+                  </select>
+                </div>`
+          }
+          <div class="field">
+            <label>Artikel</label>
+            <div class="card" id="af-artikel-liste">${artikelHtml}</div>
+          </div>
+          <div class="error-text" id="af-error"></div>
+          <div id="af-success" style="color:var(--color-success);font-size:13.5px;margin:-10px 0 14px;min-height:18px;"></div>
+          <button type="submit" class="btn btn-primary" id="af-save-btn" style="width:100%;" ${bestellschlussErreicht ? "disabled" : ""}>
+            Bestellung speichern
+          </button>
+        </form>
+      </div>
+    `;
+
+    const form = container.querySelector("#af-form");
+    const errorEl = container.querySelector("#af-error");
+    const successEl = container.querySelector("#af-success");
+    const saveBtn = container.querySelector("#af-save-btn");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorEl.textContent = "";
+      successEl.textContent = "";
+
+      const abteilungValue = role === "abteilung"
+        ? ownAbteilung
+        : container.querySelector("#af-abteilung-select").value;
+
+      if (!abteilungValue) {
+        errorEl.textContent = "Abteilung konnte nicht ermittelt werden.";
+        return;
+      }
+
+      const items = [];
+      container.querySelectorAll(".menge-input").forEach((inp) => {
+        const menge = parseInt(inp.value, 10);
+        if (menge > 0) {
+          items.push({ artikelId: inp.dataset.artikelId, artikelName: inp.dataset.artikelName, menge });
+        }
+      });
+
+      if (items.length === 0) {
+        errorEl.textContent = "Bitte mindestens einen Artikel mit Menge grösser 0 angeben.";
+        return;
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Speichert …";
+
+      try {
+        await addDoc(collection(db, "bestellungen_abteilung"), {
+          abteilung: abteilungValue,
+          liefertag: tomorrowDateString(),
+          items,
+          status: "offen",
+          erstelltVon: uid,
+          erstelltAm: serverTimestamp(),
+        });
+        successEl.textContent = "Bestellung gespeichert.";
+        container.querySelectorAll(".menge-input").forEach((inp) => { inp.value = ""; });
+      } catch (err) {
+        console.error(err);
+        errorEl.textContent = "Fehler beim Speichern. Bitte erneut versuchen.";
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Bestellung speichern";
+      }
+    });
+  }
+
   function renderSubtabView(containerId, subtabs, contentPrefix, customRenderers = {}) {
     const container = document.getElementById(containerId);
     const nav = document.createElement("div");
@@ -801,7 +1006,7 @@
     });
   }
 
-  function buildViews(tabs) {
+  function buildViews(tabs, role, uid) {
     const main = document.getElementById("main-content");
     main.innerHTML = "";
 
@@ -817,7 +1022,9 @@
 
       if (tab.id === "erstellen") {
         main.appendChild(view);
-        renderSubtabView(`view-${tab.id}`, ERSTELLEN_SUBTABS, "erstellen");
+        renderSubtabView(`view-${tab.id}`, ERSTELLEN_SUBTABS, "erstellen", {
+          "abteilung": (panel) => initAbteilungsbestellungForm(panel, { role, uid }),
+        });
       } else if (tab.id === "einstellungen") {
         main.appendChild(view);
         renderSubtabView(`view-${tab.id}`, EINSTELLUNGEN_SUBTABS, "einstellungen", {
@@ -825,6 +1032,11 @@
           "artikel-hotel": initArtikelHotelPanel,
           "bestellschluss": initBestellschlussPanel,
         });
+      } else if (tab.id === "neu-abteilung") {
+        const body = document.createElement("div");
+        view.appendChild(body);
+        main.appendChild(view);
+        initAbteilungsbestellungForm(body, { role, uid });
       } else {
         const body = document.createElement("div");
         body.innerHTML = placeholderCard(VIEW_PLACEHOLDERS[tab.id] || "Kommt in einer späteren Schicht.");
@@ -854,13 +1066,13 @@
     });
   }
 
-  function initApp(role, name) {
+  function initApp(role, name, uid) {
     const tabs = TABS_BY_ROLE[role] || TABS_BY_ROLE.abteilung;
 
     document.getElementById("user-name").textContent = name || "–";
     document.getElementById("user-role").textContent = ROLE_LABELS[role] || role;
 
-    buildViews(tabs);
+    buildViews(tabs, role, uid);
     buildTabbar(tabs);
 
     document.getElementById("loading-screen").style.display = "none";
@@ -906,7 +1118,7 @@
       }
     }
 
-    initApp(role, name);
+    initApp(role, name, user.uid);
   });
 
   document.getElementById("logout-btn").addEventListener("click", async () => {
