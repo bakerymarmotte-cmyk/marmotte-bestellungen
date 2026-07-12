@@ -299,7 +299,7 @@
   import { auth, db } from "./firebase-config.js";
   import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import {
-    doc, getDoc, collection, addDoc, updateDoc, deleteDoc, onSnapshot,
+    doc, getDoc, setDoc, collection, addDoc, updateDoc, deleteDoc, onSnapshot,
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   // ---------------------------------------------------------------------
@@ -379,6 +379,123 @@
   function nextSortValue(list) {
     if (!list.length) return 0;
     return Math.max(...list.map((item) => item.sortierung || 0)) + 1;
+  }
+
+  // -----------------------------------------------------------------
+  // Zeit-Konvertierung Schweizer Lokalzeit <-> UTC-Minuten seit Mitternacht.
+  // Bestellschluss-Zeiten werden als UTC-Minuten gespeichert (Security Rules
+  // kennen nur UTC-Serverzeit). Die Umrechnung erfolgt anhand des heutigen
+  // Datums, damit die Sommer-/Winterzeit korrekt berücksichtigt wird.
+  // Randfall: an den 2 Zeitumstellungstagen im Jahr kann es zu einer
+  // 1h-Verschiebung kommen, falls die Einstellung nicht am selben Tag neu
+  // gespeichert wird.
+  // -----------------------------------------------------------------
+  function utcMinutesToZurichTimeString(minutes) {
+    const now = new Date();
+    const utcDate = new Date(Date.UTC(
+      now.getFullYear(), now.getMonth(), now.getDate(),
+      Math.floor(minutes / 60), minutes % 60
+    ));
+    return new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/Zurich", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    }).format(utcDate);
+  }
+
+  function zurichLocalToUtcMinutes(hh, mm) {
+    const now = new Date();
+    const guessUtc = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), hh, mm));
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/Zurich",
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    }).formatToParts(guessUtc).reduce((acc, p) => { acc[p.type] = p.value; return acc; }, {});
+    const zurichWallAsUtcMillis = Date.UTC(
+      Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+      Number(parts.hour), Number(parts.minute)
+    );
+    const offsetMinutes = Math.round((zurichWallAsUtcMillis - guessUtc.getTime()) / 60000);
+    const actualUtc = new Date(guessUtc.getTime() - offsetMinutes * 60000);
+    return actualUtc.getUTCHours() * 60 + actualUtc.getUTCMinutes();
+  }
+
+  // -----------------------------------------------------------------
+  // Einstellungen > Bestellschluss-Zeiten
+  // Ein Dokument einstellungen/bestellschluss mit Feldern
+  // abteilung / kunde / hotel (jeweils UTC-Minuten seit Mitternacht).
+  // -----------------------------------------------------------------
+  async function initBestellschlussPanel(panel) {
+    panel.innerHTML = `
+      <div class="mgmt-section">
+        <h3>Bestellschluss-Zeiten</h3>
+        <p class="hint-text" style="margin:-4px 0 18px;">
+          Schweizer Lokalzeit, gilt täglich gleich, bis hier geändert. Nach Bestellschluss
+          bleiben Bestellungen sichtbar, sind aber nicht mehr bearbeitbar.
+        </p>
+        <form id="bestellschluss-form">
+          <div class="field">
+            <label for="bs-abteilung">Abteilung</label>
+            <input type="time" id="bs-abteilung" required>
+          </div>
+          <div class="field">
+            <label for="bs-kunde">Kunde</label>
+            <input type="time" id="bs-kunde" required>
+          </div>
+          <div class="field">
+            <label for="bs-hotel">Hotel/Restaurant</label>
+            <input type="time" id="bs-hotel" required>
+          </div>
+          <div class="error-text" id="bs-error"></div>
+          <div id="bs-success" style="color:var(--color-success);font-size:13.5px;margin:-10px 0 14px;min-height:18px;"></div>
+          <button type="submit" class="btn btn-primary" id="bs-save-btn" style="width:100%;">Speichern</button>
+        </form>
+      </div>
+    `;
+
+    const form = panel.querySelector("#bestellschluss-form");
+    const errorEl = panel.querySelector("#bs-error");
+    const successEl = panel.querySelector("#bs-success");
+    const saveBtn = panel.querySelector("#bs-save-btn");
+    const TYPES = ["abteilung", "kunde", "hotel"];
+
+    try {
+      const snap = await getDoc(doc(db, "einstellungen", "bestellschluss"));
+      if (snap.exists()) {
+        const data = snap.data();
+        TYPES.forEach((typ) => {
+          if (typeof data[typ] === "number") {
+            panel.querySelector(`#bs-${typ}`).value = utcMinutesToZurichTimeString(data[typ]);
+          }
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      errorEl.textContent = "Bestehende Zeiten konnten nicht geladen werden.";
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorEl.textContent = "";
+      successEl.textContent = "";
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Speichert …";
+
+      try {
+        const payload = {};
+        TYPES.forEach((typ) => {
+          const value = panel.querySelector(`#bs-${typ}`).value;
+          const [hh, mm] = value.split(":").map(Number);
+          payload[typ] = zurichLocalToUtcMinutes(hh, mm);
+        });
+        await setDoc(doc(db, "einstellungen", "bestellschluss"), payload, { merge: true });
+        successEl.textContent = "Gespeichert.";
+      } catch (err) {
+        console.error(err);
+        errorEl.textContent = "Fehler beim Speichern. Bitte erneut versuchen.";
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Speichern";
+      }
+    });
   }
 
   // -----------------------------------------------------------------
@@ -706,6 +823,7 @@
         renderSubtabView(`view-${tab.id}`, EINSTELLUNGEN_SUBTABS, "einstellungen", {
           "artikel-abteilung": initArtikelAbteilungPanel,
           "artikel-hotel": initArtikelHotelPanel,
+          "bestellschluss": initBestellschlussPanel,
         });
       } else {
         const body = document.createElement("div");
