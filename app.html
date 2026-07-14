@@ -3,1641 +3,971 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Marmotte Bestellungen</title>
+<title>Marmotte Zeiterfassung</title>
+<link rel="icon" href="assets/favicon.ico" type="image/x-icon">
+<link rel="apple-touch-icon" sizes="120x120" href="assets/appletouchicon120.png">
+<link rel="apple-touch-icon" sizes="152x152" href="assets/appletouchicon152.png">
+<link rel="apple-touch-icon" sizes="167x167" href="assets/appletouchicon167.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/appletouchicon180.png">
+<meta name="msapplication-config" content="browserconfig.xml">
+<link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1A1A1A">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Marmotte">
-<link rel="manifest" href="manifest.json">
-<link rel="icon" type="image/png" sizes="32x32" href="assets/icon_bestellungen_favicon32.png">
-<link rel="apple-touch-icon" href="assets/icon_bestellungen_appletouch180.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style>
-  html, body { height: 100%; }
-  body { display: flex; flex-direction: column; }
+  body { padding-bottom: 0; }
 
-  /* ---------- Sticky Kopfbereich (Header + Tabbar) ---------- */
-  .app-topbar {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background: var(--color-surface);
-    padding-top: env(safe-area-inset-top);
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px 8px;
+    max-width: 640px; margin: 0 auto;
   }
-
-  /* ---------- Header ---------- */
-  .app-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px 20px;
-    background: var(--color-surface);
-    border-bottom: 1px solid var(--color-border);
-  }
-  .app-header .brand {
-    font-family: var(--font-display);
-    font-weight: 800;
-    font-size: 19px;
-    color: var(--color-yellow);
+  .topbar .brand-name {
+    font-family: var(--font-display); font-weight: 800;
+    color: var(--color-yellow); font-size: 20px; line-height: 1.15;
     letter-spacing: -0.01em;
   }
-  .app-header .brand small {
-    display: block;
-    font-family: var(--font-body);
-    font-weight: 400;
-    font-size: 11px;
+  .topbar .brand-sub {
+    font-size: 10.5px; font-weight: 600;
     color: var(--color-text-muted);
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
-    margin-top: 1px;
+    letter-spacing: 0.22em; text-transform: uppercase;
+    margin-top: 2px;
   }
-  .user-box {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+  .topbar .who { display: flex; align-items: center; gap: 10px; }
+  .topbar .who .name { font-size: 13.5px; color: var(--color-text-muted); }
+  .topbar .logout-btn {
+    background: transparent; border: 1px solid var(--color-border); color: var(--color-text-muted);
+    border-radius: 8px; padding: 7px 12px; font-size: 12.5px;
   }
-  .user-meta { text-align: right; }
-  .user-meta .name {
-    font-size: 13.5px;
-    font-weight: 600;
-    line-height: 1.2;
-  }
-  .user-meta .role {
-    font-size: 11.5px;
-    color: var(--color-text-muted);
-    text-transform: capitalize;
-  }
-  .logout-btn {
-    background: transparent;
-    border: 1px solid var(--color-border);
-    color: var(--color-text-muted);
-    border-radius: var(--radius-sm);
-    padding: 8px 12px;
-    font-size: 12.5px;
-    font-weight: 600;
-  }
-  .logout-btn:hover { color: var(--color-danger); border-color: rgba(229, 72, 77, 0.4); }
+  .topbar .logout-btn:hover { border-color: var(--color-danger); color: var(--color-danger); }
 
-  /* ---------- Main content ---------- */
-  main {
-    flex: 1;
-    padding: 20px 16px 32px;
-    max-width: 640px;
-    width: 100%;
-    margin: 0 auto;
-  }
-  .view { display: none; }
-  .view.active { display: block; }
-  .view-title {
-    font-size: 18px;
-    font-weight: 700;
-    margin: 4px 0 16px;
-  }
-  .placeholder-card {
-    padding: 28px 22px;
+  main { max-width: 640px; margin: 0 auto; padding: 8px 20px 60px; }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .placeholder-box {
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 40px 20px;
     text-align: center;
     color: var(--color-text-muted);
     font-size: 14px;
-  }
-  .placeholder-card .stage-tag {
-    display: inline-block;
-    background: var(--color-surface-raised);
-    color: var(--color-yellow);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    letter-spacing: 0.03em;
-    padding: 4px 10px;
-    border-radius: 20px;
-    margin-bottom: 12px;
+    margin-top: 20px;
   }
 
-  /* Sub-tabs (z.B. innerhalb "Bestellung erstellen") */
+  /* Obere Hauptnavigation */
+  .bottom-nav {
+    position: sticky; top: 0; left: 0; right: 0;
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    max-width: 640px; margin: 0 auto;
+    z-index: 50;
+  }
+  .bottom-nav button {
+    flex: 1;
+    background: none; border: none; color: var(--color-text-muted);
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 10px 4px 10px;
+    font-size: 11px; font-family: var(--font-body); font-weight: 600;
+    border-bottom: 2px solid transparent;
+  }
+  .bottom-nav button .icon { font-size: 20px; line-height: 1; }
+  .bottom-nav button.active { color: var(--color-yellow); border-bottom-color: var(--color-yellow); }
+
+  /* Sekundäre Tabs (z.B. innerhalb Admin/Leitung) */
   .subtabs {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 18px;
-    overflow-x: auto;
+    display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 18px;
+    -webkit-overflow-scrolling: touch;
   }
-  .subtab-btn {
-    flex: none;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    color: var(--color-text-muted);
-    border-radius: 20px;
-    padding: 9px 16px;
-    font-size: 13px;
-    font-weight: 600;
+  .subtabs::-webkit-scrollbar { display: none; }
+  .subtabs button {
     white-space: nowrap;
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    border-radius: 999px; padding: 8px 16px; font-size: 13px; font-weight: 600;
   }
-  .subtab-btn.active {
-    background: var(--color-yellow);
-    color: #1a1400;
-    border-color: var(--color-yellow);
+  .subtabs button.active { background: var(--color-yellow); color: #1a1400; border-color: var(--color-yellow); }
+
+  .subpanel { display: none; }
+  .subpanel.active { display: block; }
+
+  h2.section-title { font-size: 19px; margin: 4px 0 18px; }
+
+  /* Team-Liste */
+  .employee-list { display: flex; flex-direction: column; gap: 10px; }
+  .employee-item {
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); padding: 14px 16px;
+    cursor: pointer;
+  }
+  .employee-item:hover { border-color: var(--color-yellow); }
+  .employee-item .item-line1 { font-weight: 700; font-size: 15px; }
+  .employee-item .item-line2 {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 4px; gap: 10px;
+  }
+  .employee-item .item-abteilung { font-size: 12.5px; color: var(--color-text-muted); }
+  .badge {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; background: var(--color-surface-raised); color: var(--color-text-muted);
+    flex-shrink: 0;
+  }
+  .badge.role-admin { background: rgba(253,214,0,0.15); color: var(--color-yellow); }
+  .badge.role-leitung { background: rgba(76,175,125,0.15); color: var(--color-success); }
+  .badge.role-mitarbeiter { background: rgba(74,159,224,0.15); color: #4A9FE0; }
+  .employee-item.is-inactive { opacity: 0.6; }
+  .team-filter-row { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 14px; }
+  .team-section-label {
+    font-size: 12.5px; color: var(--color-text-muted); text-transform: uppercase;
+    letter-spacing: 0.03em; font-weight: 700; margin: 20px 0 10px;
+  }
+  .team-section-label:first-child { margin-top: 0; }
+
+  .fab {
+    position: fixed; bottom: 24px; right: 20px;
+    background: var(--color-yellow); color: #1a1400;
+    width: 54px; height: 54px; border-radius: 50%;
+    border: none; font-size: 28px; font-weight: 700;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+    z-index: 40;
   }
 
-  /* ---------- Tab-Leiste (jetzt oben, direkt unter Header) ---------- */
-  .tabbar {
-    display: flex;
-    background: var(--color-surface);
-    border-bottom: 1px solid var(--color-border);
-    padding: 6px 6px;
+  /* Modal */
+  .modal-backdrop {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    align-items: flex-end; justify-content: center; z-index: 100;
   }
-  .tab-btn {
-    flex: 1;
-    background: none;
-    border: none;
-    color: var(--color-text-muted);
-    font-family: var(--font-body);
-    font-size: 11.5px;
+  .modal-backdrop.active { display: flex; }
+  .modal-sheet {
+    background: var(--color-surface); border-radius: 20px 20px 0 0;
+    width: 100%; max-width: 640px; max-height: 88vh; overflow-y: auto;
+    padding: 24px 22px calc(24px + env(safe-area-inset-bottom, 0));
+  }
+  .modal-sheet h3 { margin: 0 0 20px; font-size: 18px; }
+  .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 8px; }
+  .modal-actions .btn { flex: 1; }
+
+  .settings-card {
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); padding: 18px 18px 6px; margin-bottom: 18px;
+  }
+  .settings-card h4 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-muted); }
+
+  .holiday-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0; border-bottom: 1px solid var(--color-border);
+    font-size: 14px;
+  }
+  .holiday-row:last-child { border-bottom: none; }
+  .holiday-row .date { font-family: var(--font-mono); color: var(--color-yellow); font-size: 13px; min-width: 88px; }
+  .holiday-row .remove-btn { background: none; border: none; color: var(--color-text-muted); font-size: 18px; }
+  .holiday-row .remove-btn:hover { color: var(--color-danger); }
+
+  .feriensperre-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0; border-bottom: 1px solid var(--color-border);
+    font-size: 14px; gap: 10px;
+  }
+  .feriensperre-row:last-child { border-bottom: none; }
+  .feriensperre-row .range { font-family: var(--font-mono); color: var(--color-yellow); font-size: 13px; }
+  .feriensperre-row .name { color: var(--color-text-muted); font-size: 13px; flex: 1; }
+
+  .inline-add-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .inline-add-row .field { flex: 1; min-width: 120px; margin-bottom: 0; }
+
+  /* Live-Uhr */
+  .clock-block { text-align: center; padding: 28px 0 8px; }
+  .clock-time {
+    font-family: var(--font-mono);
+    font-size: 42px;
     font-weight: 600;
-    padding: 8px 4px 6px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    border-radius: var(--radius-sm);
-    text-align: center;
-  }
-  .tab-btn .dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: transparent;
-  }
-  .tab-btn.active { color: var(--color-yellow); }
-  .tab-btn.active .dot { background: var(--color-yellow); }
-
-  .loading-screen {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    color: var(--color-text-muted);
-    font-size: 14px;
-  }
-
-  /* ---------- Verwaltung (Gruppen/Artikel) ---------- */
-  .mgmt-section { margin-bottom: 28px; }
-  .mgmt-section h3 {
-    font-size: 12.5px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--color-text-muted);
-    margin: 0 0 12px;
-  }
-  .inline-form {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 14px;
-    flex-wrap: wrap;
-  }
-  .inline-form input, .inline-form select {
-    flex: 1;
-    min-width: 140px;
-    background: var(--color-surface-raised);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    padding: 11px 12px;
+    letter-spacing: 0.02em;
     color: var(--color-text);
-    font-size: 14px;
-    font-family: var(--font-body);
   }
-  .inline-form input:focus, .inline-form select:focus { outline: none; border-color: var(--color-yellow); }
-  .inline-form .btn { flex: none; padding: 11px 16px; font-size: 13.5px; }
+  .clock-date { color: var(--color-text-muted); font-size: 14px; margin-top: 4px; }
 
-  .list-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 12px 14px;
-    border-bottom: 1px solid var(--color-border);
+  /* Status-Karte */
+  .status-card { padding: 20px 20px 22px; margin-top: 14px; }
+  .status-row { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-weight: 700; font-size: 15px; }
+  .status-dot-badge {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--color-text-muted); flex-shrink: 0;
   }
-  .list-row:last-child { border-bottom: none; }
-  .list-row .row-name {
-    flex: 1;
+  .status-dot-badge.dot-idle { background: var(--color-text-muted); }
+  .status-dot-badge.dot-working { background: var(--color-success); }
+  .status-dot-badge.dot-break { background: var(--color-yellow); }
+
+  .status-field {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 9px 0; border-top: 1px solid var(--color-border);
     font-size: 14px;
-    min-width: 0;
-    overflow-wrap: anywhere;
   }
-  .list-row .row-name input {
-    width: 100%;
-    background: var(--color-surface-raised);
-    border: 1px solid var(--color-yellow);
-    border-radius: 6px;
-    padding: 6px 8px;
-    color: var(--color-text);
-    font-size: 14px;
-    font-family: var(--font-body);
-  }
-  .row-actions { display: flex; align-items: center; gap: 6px; flex: none; }
-  .icon-btn {
+  .status-field-label { color: var(--color-text-muted); }
+  .status-field-value { font-weight: 600; }
+
+  .stempel-actions { display: flex; gap: 10px; margin-top: 18px; }
+  .stempel-actions .btn { flex: 1; padding: 15px; font-size: 15px; }
+  .btn-yellow-outline {
     background: transparent;
-    border: 1px solid var(--color-border);
-    color: var(--color-text-muted);
-    border-radius: 6px;
-    width: 30px;
-    height: 30px;
-    font-size: 13px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .icon-btn:hover { border-color: var(--color-yellow); color: var(--color-yellow); }
-  .icon-btn.danger:hover { border-color: rgba(229, 72, 77, 0.5); color: var(--color-danger); }
-  .toggle-btn {
-    background: transparent;
-    border: 1px solid var(--color-border);
-    color: var(--color-text-muted);
-    border-radius: 20px;
-    padding: 6px 12px;
-    font-size: 12px;
-    font-weight: 700;
-  }
-  .toggle-btn.active {
-    background: rgba(76, 175, 125, 0.15);
-    border-color: var(--color-success);
-    color: var(--color-success);
-  }
-  .group-header {
-    font-size: 11.5px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
     color: var(--color-yellow);
-    padding: 12px 14px 6px;
+    border: 2px solid var(--color-yellow);
   }
-  .group-header:first-child { padding-top: 4px; }
-
-  .menge-input {
-    width: 64px;
-    text-align: center;
-    background: var(--color-surface-raised);
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
-    padding: 8px 6px;
-    color: var(--color-text);
-    font-size: 14px;
-    font-family: var(--font-body);
-    flex: none;
-  }
-  .menge-input:focus { outline: none; border-color: var(--color-yellow); }
-
-  .static-value {
-    padding: 12px 14px;
-    background: var(--color-surface-raised);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    font-size: 15px;
+  .btn-danger-solid {
+    background: var(--color-danger);
+    color: #fff;
   }
 
-  .type-badge {
-    display: inline-block;
-    font-size: 10.5px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    padding: 3px 9px;
-    border-radius: 12px;
-    background: var(--color-surface-raised);
-    color: var(--color-text-muted);
+  .shift-list-title { font-size: 15px; color: var(--color-text-muted); margin: 26px 0 10px; }
+  .shift-row {
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 10px;
   }
-  .type-badge.type-abteilung { color: #8ecbff; }
-  .type-badge.type-kunde { color: #ffd27a; }
-  .type-badge.type-hotel { color: #b7f0c0; }
+  .shift-row-main { display: flex; justify-content: space-between; font-size: 14.5px; font-weight: 600; }
+  .shift-row-pause { font-size: 12.5px; color: var(--color-text-muted); margin-top: 4px; }
 
-  .status-tag {
-    display: inline-block;
-    flex: none;
-    font-size: 11px;
-    font-weight: 700;
-    padding: 4px 11px;
-    border-radius: 14px;
-    white-space: nowrap;
+  /* Monatsübersicht */
+  .month-nav {
+    display: flex; align-items: center; justify-content: center; gap: 20px;
+    padding: 18px 0 22px;
   }
-  .status-tag.status-offen { background: rgba(253, 214, 0, 0.12); color: var(--color-yellow); }
-  .status-tag.status-in_verarbeitung { background: rgba(76, 175, 125, 0.15); color: var(--color-success); }
+  .month-nav-btn {
+    background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-text);
+    width: 38px; height: 38px; border-radius: 50%; font-size: 18px;
+  }
+  .month-nav-btn:hover { border-color: var(--color-yellow); color: var(--color-yellow); }
+  .month-label { font-family: var(--font-display); font-weight: 700; font-size: 17px; min-width: 160px; text-align: center; }
+  .month-label .week-kw { display: block; }
+  .month-label .week-dates { display: block; font-size: 12.5px; font-weight: 500; color: var(--color-text-muted); margin-top: 2px; }
+
+  .month-summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .summary-card {
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); padding: 18px; text-align: center;
+  }
+  .summary-label { font-size: 12.5px; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 8px; }
+  .summary-label .stand-line { display: block; text-transform: none; letter-spacing: normal; font-size: 11.5px; margin-top: 2px; }
+  .summary-value { font-family: var(--font-mono); font-size: 22px; font-weight: 600; }
+  .summary-value.positive { color: var(--color-success); }
+  .summary-value.negative { color: var(--color-danger); }
+
+  .summary-card.full-width { grid-column: 1 / -1; }
+
+  .balance-card {
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); padding: 16px 18px; margin-top: 12px;
+  }
+  .balance-value { font-family: var(--font-mono); font-size: 26px; font-weight: 700; margin-top: 4px; }
+  .balance-value.positive { color: var(--color-success); }
+  .balance-value.negative { color: var(--color-danger); }
+
+  .day-row {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    padding: 12px 4px; border-bottom: 1px solid var(--color-border);
+  }
+  .day-row:last-child { border-bottom: none; }
+  .day-row .day-date { font-size: 14.5px; font-weight: 600; }
+  .day-row .day-sub { font-size: 12.5px; color: var(--color-text-muted); margin-top: 2px; }
+  .day-row .day-hours { font-family: var(--font-mono); font-size: 14px; font-weight: 600; color: var(--color-text-muted); white-space: nowrap; }
+  .day-row.has-hours .day-hours { color: var(--color-text); }
+  .day-row.is-today .day-date { color: var(--color-yellow); }
+
+  /* Anträge & Abwesenheiten */
+  .form-card { padding: 18px; margin-bottom: 18px; }
+  .request-item {
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); padding: 14px 16px; margin-bottom: 10px;
+  }
+  .request-item-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .request-range { font-weight: 700; font-size: 14.5px; }
+  .request-name { font-size: 12.5px; color: var(--color-text-muted); margin-top: 2px; }
+  .request-bemerkung { font-size: 13px; color: var(--color-text-muted); margin-top: 6px; }
+  .request-begruendung { font-size: 12.5px; color: var(--color-text-muted); margin-top: 6px; font-style: italic; }
+
+  .status-badge {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+    padding: 4px 10px; border-radius: 999px; white-space: nowrap;
+  }
+  .status-badge.offen { background: rgba(253,214,0,0.15); color: var(--color-yellow); }
+  .status-badge.genehmigt { background: rgba(76,175,125,0.15); color: var(--color-success); }
+  .status-badge.abgelehnt { background: rgba(229,72,77,0.15); color: var(--color-danger); }
+
+  .request-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .request-actions .btn { flex: 1; padding: 9px; font-size: 13px; }
+  .btn-approve { background: var(--color-success); color: #06170f; }
+  .btn-reject { background: transparent; border: 1px solid var(--color-danger); color: var(--color-danger); }
+
+  .small-remove-btn {
+    background: none; border: none; color: var(--color-text-muted); font-size: 16px; flex-shrink: 0;
+  }
+  .small-remove-btn:hover { color: var(--color-danger); }
+
+  .abw-subpanel { display: none; }
+  .abw-subpanel.active { display: block; }
+
+  /* Arbeitsplan / Planung Wochenansicht */
+  .abteilung-block { margin-bottom: 28px; }
+  .abteilung-heading {
+    font-family: var(--font-display); font-weight: 800; color: var(--color-yellow);
+    font-size: 15px; text-transform: uppercase; letter-spacing: 0.03em;
+    margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--color-border);
+  }
+  .arbeitsplan-day { margin-bottom: 14px; }
+  .arbeitsplan-day-header {
+    display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px;
+  }
+  .arbeitsplan-day-header .day-weekday { font-weight: 700; font-size: 14.5px; }
+  .arbeitsplan-day-header .day-daydate { font-size: 13px; color: var(--color-text-muted); }
+  .today-badge {
+    background: var(--color-surface-raised); color: var(--color-yellow);
+    font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px;
+  }
+  .shift-card {
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 8px;
+  }
+  .shift-card.own-shift {
+    border-color: var(--color-yellow);
+    background: rgba(253, 214, 0, 0.08);
+  }
+  .shift-card.own-shift.is-today-shift {
+    background: rgba(253, 214, 0, 0.2);
+    box-shadow: 0 0 0 1px var(--color-yellow);
+  }
+  .shift-card.freiwunsch-card {
+    border: 1px dashed var(--color-border);
+    background: transparent;
+  }
+  .shift-card.freiwunsch-card .shift-card-sub { color: var(--color-text-muted); }
+  .shift-card-main { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .shift-card-time { font-family: var(--font-mono); font-size: 13px; color: var(--color-yellow); margin-top: 2px; }
+  .shift-card-sub { font-size: 12.5px; color: var(--color-text-muted); margin-top: 4px; }
+  .shift-card-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .icon-btn {
+    background: var(--color-surface-raised); border: 1px solid var(--color-border);
+    border-radius: 8px; width: 32px; height: 32px; font-size: 14px;
+  }
+  .icon-btn-danger:hover { border-color: var(--color-danger); }
+  .add-shift-btn {
+    width: 100%; background: transparent; border: 1px dashed var(--color-border);
+    color: var(--color-text-muted); border-radius: var(--radius-md); padding: 10px;
+    font-size: 13px; font-weight: 600; margin-bottom: 4px;
+  }
+  .add-shift-btn:hover { border-color: var(--color-yellow); color: var(--color-yellow); }
+  .no-shifts-text { margin-bottom: 10px; }
+
+  /* ============================================================
+     Breite Bildschirme (Tablet/Desktop) – v.a. für Admin/Leitung
+     ============================================================ */
+  @media (min-width: 900px) {
+    main {
+      max-width: 1100px;
+    }
+    .topbar, .bottom-nav {
+      max-width: none;
+      padding-left: 32px;
+      padding-right: 32px;
+    }
+
+    /* Stempel, Monat & Anträge bleiben handy-breit, auch auf grossen Bildschirmen */
+    #panel-stempel, #panel-monat, #panel-antraege {
+      max-width: 430px;
+      margin: 0 auto;
+    }
+
+    /* Team: Mitarbeiterliste als Raster statt einer Spalte */
+    .employee-list {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    /* Live-Status: mehr Karten nebeneinander */
+    .status-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    /* Übersicht & Jahresübersicht: Karten nebeneinander */
+    #uebersicht-results, #jahr-results {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      align-items: start;
+    }
+    #uebersicht-results .uebersicht-card, #jahr-results .uebersicht-card {
+      margin-bottom: 0;
+    }
+
+    /* Arbeitsplan & Planung: Abteilungen nebeneinander statt untereinander */
+    #arbeitsplan-content, #planung-content {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+    #arbeitsplan-content .abteilung-block, #planung-content .abteilung-block {
+      margin-bottom: 0;
+    }
+
+    /* Modal etwas grosszügiger */
+    .modal-sheet { max-width: 560px; border-radius: 20px; }
+    .modal-backdrop { align-items: center; }
+  }
+
+  @media (min-width: 1300px) {
+    .status-grid { grid-template-columns: repeat(4, 1fr); }
+    #uebersicht-results, #jahr-results { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  /* Live-Status */
+  .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .status-item {
+    background: var(--color-surface); border-radius: var(--radius-md);
+    padding: 14px 16px;
+  }
+  .status-item .name-row { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 14.5px; }
+  .status-item .status-label { font-size: 13px; font-weight: 700; margin-top: 6px; }
+  .status-item .status-time { font-size: 12px; color: var(--color-text-muted); margin-top: 2px; }
+
+  /* Übersicht (Auswertung) */
+  .uebersicht-card {
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); padding: 14px 16px; margin-bottom: 10px;
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+  }
+  .uebersicht-body { flex: 1; min-width: 0; }
+  .uebersicht-name-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-weight: 700; font-size: 14.5px; }
+  .uebersicht-pill {
+    font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+    background: var(--color-surface-raised); color: var(--color-text-muted); text-transform: uppercase;
+  }
+  .uebersicht-actions { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+  .uebersicht-actions .btn { padding: 8px 12px; font-size: 12.5px; white-space: nowrap; }
+  .uebersicht-stats { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; font-size: 13px; color: var(--color-text-muted); }
+  .uebersicht-stats strong { color: var(--color-text); }
+  .uebersicht-stats .negative strong { color: var(--color-danger); }
+  .uebersicht-stats .positive strong { color: var(--color-success); }
+  .uebersicht-stats-abwesenheiten { margin-top: 6px; }
+
+  .detail-shift-row {
+    background: var(--color-surface-raised); border-radius: var(--radius-md);
+    padding: 10px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  }
+  .detail-shift-row .date { font-weight: 700; font-size: 13.5px; }
+  .detail-shift-row .sub { font-size: 12px; color: var(--color-text-muted); margin-top: 2px; }
+  .manual-badge { font-size: 10px; font-weight: 700; color: var(--color-yellow); margin-left: 6px; }
+  .detail-shift-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+  /* Radio-/Checkbox-Pills im Mitarbeiter-Formular */
+  .radio-row, .checkbox-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .radio-pill, .checkbox-pill {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--color-surface-raised); border: 1px solid var(--color-border);
+    border-radius: 999px; padding: 8px 14px; font-size: 13.5px; cursor: pointer;
+  }
+  .radio-pill:has(input:checked), .checkbox-pill:has(input:checked) {
+    border-color: var(--color-yellow); color: var(--color-yellow);
+  }
+  .radio-pill input, .checkbox-pill input { accent-color: var(--color-yellow); }
+
+  .field input:disabled {
+    opacity: 0.6; cursor: not-allowed;
+  }
 </style>
 </head>
 <body>
 
-<div id="loading-screen" class="loading-screen">Wird geladen …</div>
-
-<div id="app-shell" style="display:none;">
-  <div class="app-topbar">
-    <header class="app-header">
-      <div class="brand">Marmotte<small>Bestellungen</small></div>
-      <div class="user-box">
-        <div class="user-meta">
-          <div class="name" id="user-name">–</div>
-        </div>
-        <button type="button" class="logout-btn" id="logout-btn">Abmelden</button>
-      </div>
-    </header>
-
-    <nav class="tabbar" id="tabbar">
-      <!-- Tabs werden per JS eingefügt, je nach Rolle -->
-    </nav>
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-name">Marmotte</div>
+    <div class="brand-sub">Zeiterfassung</div>
   </div>
-
-  <main id="main-content">
-    <!-- Views werden per JS eingefügt, je nach Rolle -->
-  </main>
+  <div class="who">
+    <span class="name" id="user-name-label"></span>
+    <button class="logout-btn" id="logout-btn">Abmelden</button>
+  </div>
 </div>
 
-<script type="module">
-  import { auth, db } from "./firebase-config.js";
-  import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-  import {
-    doc, getDoc, getDocs, setDoc, collection, addDoc, updateDoc, deleteDoc,
-    onSnapshot, serverTimestamp, query, where,
-  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+<nav class="bottom-nav" id="bottom-nav">
+  <button data-tab="stempel" class="active"><span class="icon">⏱</span>Stempel</button>
+  <button data-tab="monat"><span class="icon">📅</span>Monat</button>
+  <button data-tab="antraege"><span class="icon">✉️</span>Anträge</button>
+  <button data-tab="arbeitsplan"><span class="icon">🗓</span>Arbeitsplan</button>
+  <button data-tab="admin" id="admin-nav-btn" style="display:none;"><span class="icon">⚙️</span><span id="admin-nav-label">Admin</span></button>
+</nav>
 
-  // ---------------------------------------------------------------------
-  // Tab-Konfiguration je Rolle.
-  // Jeder Tab hat eine id (= View-id) und ein Label.
-  // "erstellen" (admin/leitung) hat zusätzlich Sub-Tabs zur Typ-Auswahl.
-  // ---------------------------------------------------------------------
-  const TABS_BY_ROLE = {
-    admin: [
-      { id: "bestellungen", label: "Alle Bestellungen" },
-      { id: "erstellen", label: "Bestellung erstellen" },
-      { id: "einstellungen", label: "Einstellungen" },
-    ],
-    leitung: [
-      { id: "bestellungen", label: "Alle Bestellungen" },
-      { id: "erstellen", label: "Bestellung erstellen" },
-      { id: "einstellungen", label: "Einstellungen" },
-    ],
-    abteilung: [
-      { id: "bestellungen", label: "Meine Bestellungen" },
-      { id: "neu-abteilung", label: "Abteilung" },
-      { id: "neu-kunde", label: "Kunde" },
-      { id: "neu-hotel", label: "Hotel/Rest." },
-    ],
-    hotelrestaurant: [
-      { id: "bestellungen", label: "Meine Bestellungen" },
-      { id: "neu", label: "Neue Bestellung" },
-    ],
-  };
+<main>
 
-  const ROLE_LABELS = {
-    admin: "Admin",
-    leitung: "Leitung",
-    abteilung: "Abteilung",
-    hotelrestaurant: "Hotel / Restaurant",
-  };
+  <!-- STEMPEL -->
+  <section class="tab-panel active" id="panel-stempel">
+    <div class="clock-block">
+      <div class="clock-time" id="live-clock">--:--:--</div>
+      <div class="clock-date" id="live-date"></div>
+    </div>
 
-  // Placeholder-Inhalt je View-id. Wird in späteren Schichten durch
-  // echte Formulare/Listen ersetzt.
-  const VIEW_PLACEHOLDERS = {
-    "bestellungen": "Übersicht aller Bestellungen – wird in Schicht 2 gebaut.",
-    "erstellen": null, // hat Sub-Tabs, siehe renderErstellenView
-    "einstellungen": null, // hat Sub-Tabs, siehe renderEinstellungenView
-    "neu-abteilung": "Formular Abteilungsbestellung – wird in Schicht 2 gebaut.",
-    "neu-kunde": "Formular Kundenbestellung – wird in Schicht 2 gebaut.",
-    "neu-hotel": "Formular Hotel/Restaurant-Bestellung – wird in Schicht 2 gebaut.",
-    "neu": "Formular Neue Bestellung – wird in Schicht 2 gebaut.",
-  };
-
-  const ERSTELLEN_SUBTABS = [
-    { id: "abteilung", label: "Abteilungsbestellung" },
-    { id: "kunde", label: "Kundenbestellung" },
-    { id: "hotel", label: "Hotel/Restaurant" },
-  ];
-
-  const EINSTELLUNGEN_SUBTABS = [
-    { id: "artikel-abteilung", label: "Artikel Abteilung/Kunde" },
-    { id: "artikel-hotel", label: "Artikel Hotel/Restaurant" },
-    { id: "bestellschluss", label: "Bestellschluss-Zeiten" },
-  ];
-
-  function placeholderCard(text) {
-    return `
-      <div class="card placeholder-card">
-        <span class="stage-tag">Schicht 1 – Shell</span>
-        <p>${text}</p>
+    <div class="card status-card">
+      <div class="status-row">
+        <span class="status-dot-badge" id="status-dot"></span>
+        <span id="status-label">Lädt …</span>
       </div>
-    `;
-  }
+      <div class="status-field">
+        <span class="status-field-label">Abteilung</span>
+        <span class="status-field-value" id="status-abteilung">–</span>
+      </div>
+      <div class="status-field" id="status-kommen-row" style="display:none;">
+        <span class="status-field-label">Kommen</span>
+        <span class="status-field-value" id="status-kommen">–</span>
+      </div>
+      <div class="status-field" id="status-pause-row" style="display:none;">
+        <span class="status-field-label">Pause seit</span>
+        <span class="status-field-value" id="status-pause-since">–</span>
+      </div>
 
-  function escapeHtml(str) {
-    const div = document.createElement("div");
-    div.textContent = str == null ? "" : String(str);
-    return div.innerHTML;
-  }
+      <div class="stempel-actions" id="stempel-actions"></div>
+      <div class="error-text" id="stempel-error"></div>
+    </div>
 
-  function nextSortValue(list) {
-    if (!list.length) return 0;
-    return Math.max(...list.map((item) => item.sortierung || 0)) + 1;
-  }
+    <h3 class="shift-list-title">Heutige Schichten</h3>
+    <div id="today-shift-list"></div>
+  </section>
 
-  // -----------------------------------------------------------------
-  // Zeit-Konvertierung Schweizer Lokalzeit <-> UTC-Minuten seit Mitternacht.
-  // Bestellschluss-Zeiten werden als UTC-Minuten gespeichert (Security Rules
-  // kennen nur UTC-Serverzeit). Die Umrechnung erfolgt anhand des heutigen
-  // Datums, damit die Sommer-/Winterzeit korrekt berücksichtigt wird.
-  // Randfall: an den 2 Zeitumstellungstagen im Jahr kann es zu einer
-  // 1h-Verschiebung kommen, falls die Einstellung nicht am selben Tag neu
-  // gespeichert wird.
-  // -----------------------------------------------------------------
-  function utcMinutesToZurichTimeString(minutes) {
-    const now = new Date();
-    const utcDate = new Date(Date.UTC(
-      now.getFullYear(), now.getMonth(), now.getDate(),
-      Math.floor(minutes / 60), minutes % 60
-    ));
-    return new Intl.DateTimeFormat("en-GB", {
-      timeZone: "Europe/Zurich", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-    }).format(utcDate);
-  }
+  <!-- MONAT -->
+  <section class="tab-panel" id="panel-monat">
+    <div class="month-nav">
+      <button id="month-prev" class="month-nav-btn">‹</button>
+      <span class="month-label" id="month-label">–</span>
+      <button id="month-next" class="month-nav-btn">›</button>
+    </div>
 
-  function zurichLocalToUtcMinutes(hh, mm) {
-    const now = new Date();
-    const guessUtc = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), hh, mm));
-    const parts = new Intl.DateTimeFormat("en-GB", {
-      timeZone: "Europe/Zurich",
-      year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-    }).formatToParts(guessUtc).reduce((acc, p) => { acc[p.type] = p.value; return acc; }, {});
-    const zurichWallAsUtcMillis = Date.UTC(
-      Number(parts.year), Number(parts.month) - 1, Number(parts.day),
-      Number(parts.hour), Number(parts.minute)
-    );
-    const offsetMinutes = Math.round((zurichWallAsUtcMillis - guessUtc.getTime()) / 60000);
-    const actualUtc = new Date(guessUtc.getTime() - offsetMinutes * 60000);
-    return actualUtc.getUTCHours() * 60 + actualUtc.getUTCMinutes();
-  }
+    <div class="month-summary-grid" id="month-summary-grid"></div>
 
-  // -----------------------------------------------------------------
-  // Einstellungen > Bestellschluss-Zeiten
-  // Ein Dokument einstellungen/bestellschluss mit Feldern
-  // abteilung / kunde / hotel (jeweils UTC-Minuten seit Mitternacht).
-  // -----------------------------------------------------------------
-  async function initBestellschlussPanel(panel) {
-    panel.innerHTML = `
-      <div class="mgmt-section">
-        <h3>Bestellschluss-Zeiten</h3>
-        <p class="hint-text" style="margin:-4px 0 18px;">
-          Schweizer Lokalzeit, gilt täglich gleich, bis hier geändert. Nach Bestellschluss
-          bleiben Bestellungen sichtbar, sind aber nicht mehr bearbeitbar.
-        </p>
-        <form id="bestellschluss-form">
+    <div id="month-day-list"></div>
+  </section>
+
+  <!-- ANTRÄGE -->
+  <section class="tab-panel" id="panel-antraege">
+    <div class="subtabs" id="antraege-subtabs">
+      <button data-sub="ferien" class="active">🌴 Ferien Anträge</button>
+      <button data-sub="freiwuensche">☁️ Frei Wünsche</button>
+    </div>
+
+    <div class="subpanel active" id="antraege-sub-ferien">
+      <div class="card form-card">
+        <div class="form-row-2">
+          <div class="field"><label for="ferien-von">Von</label><input type="date" id="ferien-von"></div>
+          <div class="field"><label for="ferien-bis">Bis</label><input type="date" id="ferien-bis"></div>
+        </div>
+        <div class="field"><label for="ferien-bemerkung">Bemerkung (optional)</label><input type="text" id="ferien-bemerkung"></div>
+        <div class="error-text" id="ferien-error"></div>
+        <button class="btn btn-primary" id="ferien-submit-btn" style="width:100%;">Ferien beantragen</button>
+      </div>
+      <div id="ferien-list"></div>
+    </div>
+
+    <div class="subpanel" id="antraege-sub-freiwuensche">
+      <p class="hint-text" style="margin: 0 0 14px;">Frei Wünsche werden nach Möglichkeit berücksichtigt.</p>
+      <div class="card form-card">
+        <div class="field"><label for="freiwunsch-datum">Datum</label><input type="date" id="freiwunsch-datum"></div>
+        <div class="field"><label for="freiwunsch-bemerkung">Bemerkung (optional)</label><input type="text" id="freiwunsch-bemerkung"></div>
+        <div class="error-text" id="freiwunsch-error"></div>
+        <button class="btn btn-primary" id="freiwunsch-submit-btn" style="width:100%;">Wunsch eintragen</button>
+      </div>
+      <div id="freiwunsch-list"></div>
+    </div>
+  </section>
+
+  <!-- ARBEITSPLAN -->
+  <section class="tab-panel" id="panel-arbeitsplan">
+    <div class="month-nav">
+      <button id="week-prev" class="month-nav-btn">‹</button>
+      <span class="month-label" id="week-label">–</span>
+      <button id="week-next" class="month-nav-btn">›</button>
+    </div>
+    <div id="arbeitsplan-content"></div>
+  </section>
+
+  <!-- ADMIN/LEITUNG -->
+  <section class="tab-panel" id="panel-admin">
+    <div class="subtabs" id="admin-subtabs">
+      <button data-sub="team" class="active">Team</button>
+      <button data-sub="auswertung">Auswertung</button>
+      <button data-sub="abwesenheiten">Abwesenheiten</button>
+      <button data-sub="planung">Planung</button>
+      <button data-sub="einstellungen">Einstellungen</button>
+    </div>
+
+    <div class="subpanel active" id="sub-team">
+      <div class="subtabs" id="team-subnav">
+        <button data-teamview="list" class="active">👥 Mitarbeitende</button>
+        <button data-teamview="form">+ Neu</button>
+      </div>
+
+      <div id="team-list-view">
+        <div class="subtabs team-filter-row" id="team-abteilung-filter">
+          <button data-filter="alle" class="active">Alle</button>
+          <button data-filter="Bäckerei">Bäckerei</button>
+          <button data-filter="Tearoom&Laden">Tearoom & Laden</button>
+          <button data-filter="Dorfladen">Dorfladen</button>
+        </div>
+        <div id="employee-list" class="employee-list"></div>
+        <div id="employee-list-inactive-wrap">
+          <div class="team-section-label">Inaktive Mitarbeitende</div>
+          <div id="employee-list-inactive" class="employee-list"></div>
+        </div>
+      </div>
+
+      <div id="team-form-view" style="display:none;">
+        <h3 class="section-title" id="team-form-title">Neuen Mitarbeitenden hinzufügen</h3>
+        <form id="employee-form">
           <div class="field">
-            <label for="bs-abteilung">Abteilung</label>
-            <input type="time" id="bs-abteilung" required>
+            <label for="emp-name">Name</label>
+            <input type="text" id="emp-name" required>
           </div>
           <div class="field">
-            <label for="bs-kunde">Kunde</label>
-            <input type="time" id="bs-kunde" required>
+            <label for="emp-personalnummer">Personalnummer</label>
+            <input type="text" id="emp-personalnummer" required>
           </div>
           <div class="field">
-            <label for="bs-hotel">Hotel/Restaurant</label>
-            <input type="time" id="bs-hotel" required>
+            <label for="emp-email">E-Mail</label>
+            <input type="email" id="emp-email" required>
           </div>
-          <div class="error-text" id="bs-error"></div>
-          <div id="bs-success" style="color:var(--color-success);font-size:13.5px;margin:-10px 0 14px;min-height:18px;"></div>
-          <button type="submit" class="btn btn-primary" id="bs-save-btn" style="width:100%;">Speichern</button>
-        </form>
-      </div>
-    `;
+          <div class="field" id="emp-password-field">
+            <label for="emp-password">Passwort (temporär)</label>
+            <input type="text" id="emp-password" minlength="6">
+            <span class="hint-text">Der Mitarbeiter muss es beim ersten Login selbst ändern.</span>
+          </div>
 
-    const form = panel.querySelector("#bestellschluss-form");
-    const errorEl = panel.querySelector("#bs-error");
-    const successEl = panel.querySelector("#bs-success");
-    const saveBtn = panel.querySelector("#bs-save-btn");
-    const TYPES = ["abteilung", "kunde", "hotel"];
-
-    try {
-      const snap = await getDoc(doc(db, "einstellungen", "bestellschluss"));
-      if (snap.exists()) {
-        const data = snap.data();
-        TYPES.forEach((typ) => {
-          if (typeof data[typ] === "number") {
-            panel.querySelector(`#bs-${typ}`).value = utcMinutesToZurichTimeString(data[typ]);
-          }
-        });
-      }
-    } catch (err) {
-      console.error(err);
-      errorEl.textContent = "Bestehende Zeiten konnten nicht geladen werden.";
-    }
-
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      errorEl.textContent = "";
-      successEl.textContent = "";
-      saveBtn.disabled = true;
-      saveBtn.textContent = "Speichert …";
-
-      try {
-        const payload = {};
-        TYPES.forEach((typ) => {
-          const value = panel.querySelector(`#bs-${typ}`).value;
-          const [hh, mm] = value.split(":").map(Number);
-          payload[typ] = zurichLocalToUtcMinutes(hh, mm);
-        });
-        await setDoc(doc(db, "einstellungen", "bestellschluss"), payload, { merge: true });
-        successEl.textContent = "Gespeichert.";
-      } catch (err) {
-        console.error(err);
-        errorEl.textContent = "Fehler beim Speichern. Bitte erneut versuchen.";
-      } finally {
-        saveBtn.disabled = false;
-        saveBtn.textContent = "Speichern";
-      }
-    });
-  }
-
-  // -----------------------------------------------------------------
-  // Einstellungen > Artikel Abteilung/Kunde
-  // Verwaltet zwei Collections: artikel_gruppen (name, sortierung)
-  // und artikel_abteilung (name, aktiv, gruppe, sortierung).
-  // -----------------------------------------------------------------
-  function initArtikelAbteilungPanel(panel) {
-    panel.innerHTML = `
-      <div class="mgmt-section">
-        <h3>Gruppen</h3>
-        <form class="inline-form" id="gruppe-form">
-          <input type="text" id="gruppe-name-input" placeholder="Neue Gruppe…" required>
-          <button type="submit" class="btn btn-secondary">Hinzufügen</button>
-        </form>
-        <div class="card" id="gruppen-list"></div>
-      </div>
-      <div class="mgmt-section">
-        <h3>Artikel</h3>
-        <form class="inline-form" id="artikel-form">
-          <input type="text" id="artikel-name-input" placeholder="Artikelname…" required>
-          <select id="artikel-gruppe-select" required></select>
-          <button type="submit" class="btn btn-secondary">Hinzufügen</button>
-        </form>
-        <div class="card" id="artikel-list"></div>
-      </div>
-    `;
-
-    let gruppen = [];
-    let artikel = [];
-
-    const gruppenListEl = panel.querySelector("#gruppen-list");
-    const artikelListEl = panel.querySelector("#artikel-list");
-    const gruppeSelect = panel.querySelector("#artikel-gruppe-select");
-
-    function renderGruppen() {
-      if (!gruppen.length) {
-        gruppenListEl.innerHTML = `<div class="list-row"><span class="hint-text">Noch keine Gruppen angelegt.</span></div>`;
-      } else {
-        gruppenListEl.innerHTML = gruppen
-          .map(
-            (g) => `
-          <div class="list-row" data-id="${g.id}">
-            <span class="row-name" data-role="display">${escapeHtml(g.name)}</span>
-            <div class="row-actions">
-              <button type="button" class="icon-btn" data-action="edit" title="Umbenennen">✎</button>
-              <button type="button" class="icon-btn danger" data-action="delete" title="Löschen">🗑</button>
+          <div class="field">
+            <label>Anstellungsart</label>
+            <div class="radio-row">
+              <label class="radio-pill"><input type="radio" name="emp-anstellungsart" value="festangestellt" checked> Festangestellt</label>
+              <label class="radio-pill"><input type="radio" name="emp-anstellungsart" value="stundenlohn"> Stundenlöhner</label>
             </div>
-          </div>`
-          )
-          .join("");
-      }
-      gruppeSelect.innerHTML = gruppen
-        .map((g) => `<option value="${escapeHtml(g.name)}">${escapeHtml(g.name)}</option>`)
-        .join("");
-    }
-
-    function renderArtikel() {
-      if (!artikel.length) {
-        artikelListEl.innerHTML = `<div class="list-row"><span class="hint-text">Noch keine Artikel angelegt.</span></div>`;
-        return;
-      }
-      const byGroup = {};
-      artikel.forEach((a) => {
-        const g = a.gruppe || "Ohne Gruppe";
-        (byGroup[g] = byGroup[g] || []).push(a);
-      });
-      const knownOrder = gruppen.map((g) => g.name);
-      const extraGroups = Object.keys(byGroup).filter((g) => !knownOrder.includes(g));
-      const groupOrder = [...knownOrder, ...extraGroups].filter((g) => byGroup[g]);
-
-      artikelListEl.innerHTML = groupOrder
-        .map((g) => {
-          const rows = byGroup[g]
-            .slice()
-            .sort((a, b) => (a.sortierung || 0) - (b.sortierung || 0))
-            .map(
-              (a) => `
-            <div class="list-row" data-id="${a.id}">
-              <span class="row-name" data-role="display">${escapeHtml(a.name)}</span>
-              <div class="row-actions">
-                <button type="button" class="toggle-btn ${a.aktiv ? "active" : ""}" data-action="toggle">${a.aktiv ? "Aktiv" : "Inaktiv"}</button>
-                <button type="button" class="icon-btn" data-action="edit" title="Umbenennen">✎</button>
-                <button type="button" class="icon-btn danger" data-action="delete" title="Löschen">🗑</button>
-              </div>
-            </div>`
-            )
-            .join("");
-          return `<div class="group-header">${escapeHtml(g)}</div>${rows}`;
-        })
-        .join("");
-    }
-
-    onSnapshot(collection(db, "artikel_gruppen"), (snap) => {
-      gruppen = snap.docs
-        .map((d) => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => (a.sortierung || 0) - (b.sortierung || 0));
-      renderGruppen();
-      renderArtikel();
-    });
-
-    onSnapshot(collection(db, "artikel_abteilung"), (snap) => {
-      artikel = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      renderArtikel();
-    });
-
-    panel.querySelector("#gruppe-form").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const input = panel.querySelector("#gruppe-name-input");
-      const name = input.value.trim();
-      if (!name) return;
-      await addDoc(collection(db, "artikel_gruppen"), {
-        name,
-        sortierung: nextSortValue(gruppen),
-      });
-      input.value = "";
-    });
-
-    panel.querySelector("#artikel-form").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const nameInput = panel.querySelector("#artikel-name-input");
-      const name = nameInput.value.trim();
-      const gruppe = gruppeSelect.value;
-      if (!name || !gruppe) return;
-      const sortierung = nextSortValue(artikel.filter((a) => a.gruppe === gruppe));
-      await addDoc(collection(db, "artikel_abteilung"), {
-        name,
-        aktiv: true,
-        gruppe,
-        sortierung,
-      });
-      nameInput.value = "";
-    });
-
-    gruppenListEl.addEventListener("click", (e) => handleRowAction(e, "artikel_gruppen", gruppen));
-    artikelListEl.addEventListener("click", (e) => handleRowAction(e, "artikel_abteilung", artikel));
-
-    async function handleRowAction(e, collectionName, sourceList) {
-      const actionBtn = e.target.closest("[data-action]");
-      if (!actionBtn) return;
-      const row = e.target.closest(".list-row");
-      const id = row?.dataset.id;
-      if (!id) return;
-      const action = actionBtn.dataset.action;
-      const item = sourceList.find((i) => i.id === id);
-
-      if (action === "delete") {
-        const label = collectionName === "artikel_gruppen" ? "diese Gruppe" : "diesen Artikel";
-        if (!confirm(`Soll ${label} wirklich gelöscht werden?`)) return;
-        await deleteDoc(doc(db, collectionName, id));
-      } else if (action === "toggle") {
-        await updateDoc(doc(db, collectionName, id), { aktiv: !item.aktiv });
-      } else if (action === "edit") {
-        const nameEl = row.querySelector('[data-role="display"]');
-        const currentName = item ? item.name : nameEl.textContent;
-        nameEl.innerHTML = `<input type="text" value="${escapeHtml(currentName)}">`;
-        const editInput = nameEl.querySelector("input");
-        editInput.focus();
-        editInput.select();
-
-        const commit = async () => {
-          const newName = editInput.value.trim();
-          if (newName && newName !== currentName) {
-            await updateDoc(doc(db, collectionName, id), { name: newName });
-          } else {
-            nameEl.textContent = currentName;
-          }
-        };
-        editInput.addEventListener("blur", commit);
-        editInput.addEventListener("keydown", (ev) => {
-          if (ev.key === "Enter") editInput.blur();
-          if (ev.key === "Escape") { nameEl.textContent = currentName; }
-        });
-      }
-    }
-  }
-
-  // -----------------------------------------------------------------
-  // Einstellungen > Artikel Hotel/Restaurant
-  // Eigene, ungruppierte Collection artikel_hotel (name, aktiv),
-  // alphabetisch sortiert.
-  // -----------------------------------------------------------------
-  function initArtikelHotelPanel(panel) {
-    panel.innerHTML = `
-      <div class="mgmt-section">
-        <h3>Artikel Hotel/Restaurant</h3>
-        <form class="inline-form" id="hotel-artikel-form">
-          <input type="text" id="hotel-artikel-name-input" placeholder="Artikelname…" required>
-          <button type="submit" class="btn btn-secondary">Hinzufügen</button>
-        </form>
-        <div class="card" id="hotel-artikel-list"></div>
-      </div>
-    `;
-
-    let artikel = [];
-    const listEl = panel.querySelector("#hotel-artikel-list");
-
-    function render() {
-      if (!artikel.length) {
-        listEl.innerHTML = `<div class="list-row"><span class="hint-text">Noch keine Artikel angelegt.</span></div>`;
-        return;
-      }
-      const sorted = artikel.slice().sort((a, b) => a.name.localeCompare(b.name, "de"));
-      listEl.innerHTML = sorted
-        .map(
-          (a) => `
-        <div class="list-row" data-id="${a.id}">
-          <span class="row-name" data-role="display">${escapeHtml(a.name)}</span>
-          <div class="row-actions">
-            <button type="button" class="toggle-btn ${a.aktiv ? "active" : ""}" data-action="toggle">${a.aktiv ? "Aktiv" : "Inaktiv"}</button>
-            <button type="button" class="icon-btn" data-action="edit" title="Umbenennen">✎</button>
-            <button type="button" class="icon-btn danger" data-action="delete" title="Löschen">🗑</button>
           </div>
-        </div>`
-        )
-        .join("");
-    }
 
-    onSnapshot(collection(db, "artikel_hotel"), (snap) => {
-      artikel = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      render();
-    });
-
-    panel.querySelector("#hotel-artikel-form").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const input = panel.querySelector("#hotel-artikel-name-input");
-      const name = input.value.trim();
-      if (!name) return;
-      await addDoc(collection(db, "artikel_hotel"), { name, aktiv: true });
-      input.value = "";
-    });
-
-    listEl.addEventListener("click", async (e) => {
-      const actionBtn = e.target.closest("[data-action]");
-      if (!actionBtn) return;
-      const row = e.target.closest(".list-row");
-      const id = row?.dataset.id;
-      if (!id) return;
-      const action = actionBtn.dataset.action;
-      const item = artikel.find((i) => i.id === id);
-
-      if (action === "delete") {
-        if (!confirm("Soll dieser Artikel wirklich gelöscht werden?")) return;
-        await deleteDoc(doc(db, "artikel_hotel", id));
-      } else if (action === "toggle") {
-        await updateDoc(doc(db, "artikel_hotel", id), { aktiv: !item.aktiv });
-      } else if (action === "edit") {
-        const nameEl = row.querySelector('[data-role="display"]');
-        const currentName = item ? item.name : nameEl.textContent;
-        nameEl.innerHTML = `<input type="text" value="${escapeHtml(currentName)}">`;
-        const editInput = nameEl.querySelector("input");
-        editInput.focus();
-        editInput.select();
-
-        const commit = async () => {
-          const newName = editInput.value.trim();
-          if (newName && newName !== currentName) {
-            await updateDoc(doc(db, "artikel_hotel", id), { name: newName });
-          } else {
-            nameEl.textContent = currentName;
-          }
-        };
-        editInput.addEventListener("blur", commit);
-        editInput.addEventListener("keydown", (ev) => {
-          if (ev.key === "Enter") editInput.blur();
-          if (ev.key === "Escape") { nameEl.textContent = currentName; }
-        });
-      }
-    });
-  }
-
-  // -----------------------------------------------------------------
-  // Wiederverwendbare Artikel-Auswahl (Abteilung + Kunde teilen sich die
-  // gleiche Artikelliste artikel_abteilung, gruppiert nach artikel_gruppen).
-  // -----------------------------------------------------------------
-  async function loadArtikelAbteilungGrouped() {
-    const [artikelSnap, gruppenSnap] = await Promise.all([
-      getDocs(collection(db, "artikel_abteilung")),
-      getDocs(collection(db, "artikel_gruppen")),
-    ]);
-    const artikelListRaw = artikelSnap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((a) => a.aktiv);
-    const gruppen = gruppenSnap.docs
-      .map((d) => ({ id: d.id, ...d.data() }))
-      .sort((a, b) => (a.sortierung || 0) - (b.sortierung || 0));
-    return { artikelListRaw, gruppen };
-  }
-
-  function renderArtikelAuswahlHtml(artikelListRaw, gruppen) {
-    if (artikelListRaw.length === 0) {
-      return `<p class="hint-text">Keine aktiven Artikel vorhanden. Bitte zuerst in den Einstellungen Artikel anlegen.</p>`;
-    }
-    const byGroup = {};
-    artikelListRaw.forEach((a) => {
-      const g = a.gruppe || "Ohne Gruppe";
-      (byGroup[g] = byGroup[g] || []).push(a);
-    });
-    const knownOrder = gruppen.map((g) => g.name);
-    const extraGroups = Object.keys(byGroup).filter((g) => !knownOrder.includes(g));
-    const groupOrder = [...knownOrder, ...extraGroups].filter((g) => byGroup[g]);
-
-    return groupOrder
-      .map((g) => {
-        const rows = byGroup[g]
-          .slice()
-          .sort((a, b) => (a.sortierung || 0) - (b.sortierung || 0))
-          .map(
-            (a) => `
-          <div class="list-row">
-            <span class="row-name">${escapeHtml(a.name)}</span>
-            <input type="number" min="0" step="1" placeholder="0" class="menge-input"
-                   data-artikel-id="${a.id}" data-artikel-name="${escapeHtml(a.name)}">
-          </div>`
-          )
-          .join("");
-        return `<div class="group-header">${escapeHtml(g)}</div>${rows}`;
-      })
-      .join("");
-  }
-
-  function collectMengeItems(container) {
-    const items = [];
-    container.querySelectorAll(".menge-input").forEach((inp) => {
-      const menge = parseInt(inp.value, 10);
-      if (menge > 0) {
-        items.push({ artikelId: inp.dataset.artikelId, artikelName: inp.dataset.artikelName, menge });
-      }
-    });
-    return items;
-  }
-
-  function todayDateString() {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  }
-
-  async function isBestellschlussErreicht(typ) {
-    try {
-      const bsSnap = await getDoc(doc(db, "einstellungen", "bestellschluss"));
-      if (bsSnap.exists() && typeof bsSnap.data()[typ] === "number") {
-        const now = new Date();
-        const nowUtcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
-        return nowUtcMinutes >= bsSnap.data()[typ];
-      }
-    } catch (err) {
-      console.error(err);
-    }
-    return false;
-  }
-
-  // -----------------------------------------------------------------
-  // Datums-Helfer: Abteilungsbestellungen sind immer "heute auf morgen".
-  // -----------------------------------------------------------------
-  function tomorrowDateString() {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  }
-
-  function formatDateDe(isoDateStr) {
-    const [y, m, d] = isoDateStr.split("-");
-    return `${d}.${m}.${y}`;
-  }
-
-  // -----------------------------------------------------------------
-  // Abteilungsbestellung erstellen.
-  // Wird sowohl von Rolle 'abteilung' (eigene Abteilung fix) als auch von
-  // admin/leitung (Abteilung per Dropdown wählbar) verwendet.
-  // -----------------------------------------------------------------
-  async function initAbteilungsbestellungForm(container, { role, uid }) {
-    container.innerHTML = `<div class="card placeholder-card"><p>Formular wird geladen …</p></div>`;
-
-    const bestellschlussErreicht = await isBestellschlussErreicht("abteilung");
-
-    let ownAbteilung = null;
-    if (role === "abteilung") {
-      try {
-        const userSnap = await getDoc(doc(db, "users", uid));
-        ownAbteilung = userSnap.exists() ? userSnap.data().abteilung : null;
-      } catch (err) {
-        console.error(err);
-      }
-    }
-
-    const { artikelListRaw, gruppen } = await loadArtikelAbteilungGrouped();
-    const artikelHtml = renderArtikelAuswahlHtml(artikelListRaw, gruppen);
-
-    container.innerHTML = `
-      <div class="card" style="padding:20px;">
-        ${bestellschlussErreicht ? `<div class="error-text" style="margin-bottom:14px;">Bestellschluss für heute erreicht – es kann aktuell keine Abteilungsbestellung mehr erstellt werden.</div>` : ""}
-        <form id="af-form">
-          <div class="field">
-            <label>Lieferung</label>
-            <div class="static-value">Morgen, ${formatDateDe(tomorrowDateString())}</div>
+          <div class="form-row-2">
+            <div class="field">
+              <label for="emp-stellenprozent">Stellenprozent (%)</label>
+              <input type="number" id="emp-stellenprozent" min="1" max="100" value="100">
+            </div>
+            <div class="field">
+              <label for="emp-arbeitstage">Arbeitstage / Woche</label>
+              <input type="number" id="emp-arbeitstage" min="1" max="7" value="5">
+            </div>
           </div>
-          ${
-            role === "abteilung"
-              ? `<div class="field">
-                  <label>Abteilung</label>
-                  <div class="static-value">${ownAbteilung === "dorfladen" ? "Dorfladen" : "Tearoom & Laden"}</div>
-                </div>`
-              : `<div class="field">
-                  <label for="af-abteilung-select">Abteilung</label>
-                  <select id="af-abteilung-select" required>
-                    <option value="tearoom_laden">Tearoom &amp; Laden</option>
-                    <option value="dorfladen">Dorfladen</option>
-                  </select>
-                </div>`
-          }
-          <div class="field">
-            <label>Artikel</label>
-            <div class="card" id="af-artikel-liste">${artikelHtml}</div>
+
+          <div class="form-row-2">
+            <div class="field" id="emp-wochenstunden-field">
+              <label for="emp-wochenstunden-auto">Wochenstunden (auto)</label>
+              <input type="text" id="emp-wochenstunden-auto" disabled value="—">
+            </div>
+            <div class="field">
+              <label for="emp-ferientage-auto">Ferientage / Jahr (auto)</label>
+              <input type="text" id="emp-ferientage-auto" disabled value="—">
+            </div>
           </div>
-          <div class="error-text" id="af-error"></div>
-          <div id="af-success" style="color:var(--color-success);font-size:13.5px;margin:-10px 0 14px;min-height:18px;"></div>
-          <button type="submit" class="btn btn-primary" id="af-save-btn" style="width:100%;" ${bestellschlussErreicht ? "disabled" : ""}>
-            Bestellung speichern
-          </button>
-        </form>
-      </div>
-    `;
 
-    const form = container.querySelector("#af-form");
-    const errorEl = container.querySelector("#af-error");
-    const successEl = container.querySelector("#af-success");
-    const saveBtn = container.querySelector("#af-save-btn");
+          <div class="form-row-2">
+            <div class="field" id="emp-anstellungsdatum-field">
+              <label for="emp-anstellungsdatum">Anstellungsdatum</label>
+              <input type="date" id="emp-anstellungsdatum" required>
+            </div>
 
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      errorEl.textContent = "";
-      successEl.textContent = "";
-
-      const abteilungValue = role === "abteilung"
-        ? ownAbteilung
-        : container.querySelector("#af-abteilung-select").value;
-
-      if (!abteilungValue) {
-        errorEl.textContent = "Abteilung konnte nicht ermittelt werden.";
-        return;
-      }
-
-      const items = collectMengeItems(container);
-      if (items.length === 0) {
-        errorEl.textContent = "Bitte mindestens einen Artikel mit Menge grösser 0 angeben.";
-        return;
-      }
-
-      saveBtn.disabled = true;
-      saveBtn.textContent = "Speichert …";
-
-      try {
-        await addDoc(collection(db, "bestellungen_abteilung"), {
-          abteilung: abteilungValue,
-          liefertag: tomorrowDateString(),
-          items,
-          status: "offen",
-          erstelltVon: uid,
-          erstelltAm: serverTimestamp(),
-        });
-        successEl.textContent = "Bestellung gespeichert.";
-        container.querySelectorAll(".menge-input").forEach((inp) => { inp.value = ""; });
-      } catch (err) {
-        console.error(err);
-        errorEl.textContent = "Fehler beim Speichern. Bitte erneut versuchen.";
-      } finally {
-        saveBtn.disabled = false;
-        saveBtn.textContent = "Bestellung speichern";
-      }
-    });
-  }
-
-  // -----------------------------------------------------------------
-  // Kundenbestellung erstellen.
-  // Wird von Rolle 'abteilung' (Kunde ruft an/mailt/steht im Laden) und von
-  // admin/leitung erfasst. Teilt sich die Artikelliste mit der Abteilung.
-  // -----------------------------------------------------------------
-  async function initKundenbestellungForm(container, { role, uid }) {
-    container.innerHTML = `<div class="card placeholder-card"><p>Formular wird geladen …</p></div>`;
-
-    const bestellschlussErreicht = await isBestellschlussErreicht("kunde");
-    const { artikelListRaw, gruppen } = await loadArtikelAbteilungGrouped();
-    const artikelHtml = renderArtikelAuswahlHtml(artikelListRaw, gruppen);
-    const todayStr = todayDateString();
-
-    container.innerHTML = `
-      <div class="card" style="padding:20px;">
-        ${bestellschlussErreicht ? `<div class="error-text" style="margin-bottom:14px;">Bestellschluss für heute erreicht – es können aktuell keine neuen Kundenbestellungen erstellt werden.</div>` : ""}
-        <form id="kf-form">
-          <div class="field">
-            <label for="kf-kundenname">Kundenname</label>
-            <input type="text" id="kf-kundenname" required>
+            <div class="field" id="emp-kuendigungsdatum-field" style="display:none;">
+              <label for="emp-kuendigungsdatum">Kündigungsdatum</label>
+              <input type="date" id="emp-kuendigungsdatum">
+            </div>
           </div>
+
           <div class="field">
-            <label for="kf-liefertag">Liefertag</label>
-            <input type="date" id="kf-liefertag" min="${todayStr}" value="${todayStr}" required>
+            <label>Abteilungen</label>
+            <div class="checkbox-row">
+              <label class="checkbox-pill"><input type="checkbox" value="Bäckerei" class="emp-abteilung-cb"> Bäckerei</label>
+              <label class="checkbox-pill"><input type="checkbox" value="Tearoom&Laden" class="emp-abteilung-cb"> Tearoom & Laden</label>
+              <label class="checkbox-pill"><input type="checkbox" value="Dorfladen" class="emp-abteilung-cb"> Dorfladen</label>
+            </div>
           </div>
+
           <div class="field">
-            <label for="kf-liefermethode">Liefermethode</label>
-            <select id="kf-liefermethode">
-              <option value="abholung">Abholung</option>
-              <option value="lieferung">Lieferung</option>
+            <label for="emp-rolle">Rolle</label>
+            <select id="emp-rolle">
+              <option value="mitarbeiter">Mitarbeiter</option>
+              <option value="leitung">Leitung</option>
             </select>
           </div>
-          <div id="kf-lieferfelder" style="display:none;">
-            <div class="field">
-              <label for="kf-adresse">Rechnungsadresse</label>
-              <textarea id="kf-adresse" rows="3" style="width:100%;background:var(--color-surface-raised);border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:12px 14px;color:var(--color-text);font-size:15px;font-family:var(--font-body);resize:vertical;"></textarea>
-            </div>
-            <div class="field">
-              <label for="kf-telefon">Telefon</label>
-              <input type="tel" id="kf-telefon">
-            </div>
-            <div class="field">
-              <label for="kf-email">E-Mail</label>
-              <input type="email" id="kf-email">
-            </div>
-          </div>
-          <div class="field">
-            <label>Artikel</label>
-            <div class="card" id="kf-artikel-liste">${artikelHtml}</div>
-          </div>
-          <div class="error-text" id="kf-error"></div>
-          <div id="kf-success" style="color:var(--color-success);font-size:13.5px;margin:-10px 0 14px;min-height:18px;"></div>
-          <button type="submit" class="btn btn-primary" id="kf-save-btn" style="width:100%;" ${bestellschlussErreicht ? "disabled" : ""}>
-            Bestellung speichern
-          </button>
+
+          <div class="error-text" id="employee-error"></div>
+
+          <button type="button" class="btn btn-secondary" id="employee-toggle-active-btn" style="width:100%; display:none; margin-bottom:10px;"></button>
+          <button type="submit" class="btn btn-primary" id="employee-save-btn" style="width:100%;">Mitarbeitenden erstellen</button>
         </form>
       </div>
-    `;
+    </div>
 
-    const form = container.querySelector("#kf-form");
-    const methodeSelect = container.querySelector("#kf-liefermethode");
-    const lieferfelder = container.querySelector("#kf-lieferfelder");
-    const errorEl = container.querySelector("#kf-error");
-    const successEl = container.querySelector("#kf-success");
-    const saveBtn = container.querySelector("#kf-save-btn");
-
-    methodeSelect.addEventListener("change", () => {
-      lieferfelder.style.display = methodeSelect.value === "lieferung" ? "block" : "none";
-    });
-
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      errorEl.textContent = "";
-      successEl.textContent = "";
-
-      const kundenName = container.querySelector("#kf-kundenname").value.trim();
-      const liefertag = container.querySelector("#kf-liefertag").value;
-      const liefermethode = methodeSelect.value;
-
-      if (!kundenName) {
-        errorEl.textContent = "Bitte einen Kundennamen angeben.";
-        return;
-      }
-      if (!liefertag) {
-        errorEl.textContent = "Bitte einen Liefertag angeben.";
-        return;
-      }
-
-      let rechnungsadresse = "", telefon = "", email = "";
-      if (liefermethode === "lieferung") {
-        rechnungsadresse = container.querySelector("#kf-adresse").value.trim();
-        telefon = container.querySelector("#kf-telefon").value.trim();
-        email = container.querySelector("#kf-email").value.trim();
-        if (!rechnungsadresse) {
-          errorEl.textContent = "Bitte eine Rechnungsadresse angeben.";
-          return;
-        }
-        if (!telefon && !email) {
-          errorEl.textContent = "Bitte Telefon oder E-Mail angeben.";
-          return;
-        }
-      }
-
-      const items = collectMengeItems(container);
-      if (items.length === 0) {
-        errorEl.textContent = "Bitte mindestens einen Artikel mit Menge grösser 0 angeben.";
-        return;
-      }
-
-      saveBtn.disabled = true;
-      saveBtn.textContent = "Speichert …";
-
-      try {
-        const payload = {
-          kundenName,
-          liefertag,
-          liefermethode,
-          items,
-          status: "offen",
-          erstelltVon: uid,
-          erstelltAm: serverTimestamp(),
-        };
-        if (liefermethode === "lieferung") {
-          payload.rechnungsadresse = rechnungsadresse;
-          payload.telefon = telefon;
-          payload.email = email;
-        }
-        await addDoc(collection(db, "bestellungen_kunde"), payload);
-        successEl.textContent = "Bestellung gespeichert.";
-        form.reset();
-        lieferfelder.style.display = "none";
-        container.querySelectorAll(".menge-input").forEach((inp) => { inp.value = ""; });
-        container.querySelector("#kf-liefertag").value = todayStr;
-      } catch (err) {
-        console.error(err);
-        errorEl.textContent = "Fehler beim Speichern. Bitte erneut versuchen.";
-      } finally {
-        saveBtn.disabled = false;
-        saveBtn.textContent = "Bestellung speichern";
-      }
-    });
-  }
-
-  // -----------------------------------------------------------------
-  // Hotel/Restaurant-Bestellung erstellen.
-  // Wird von Rolle 'hotelrestaurant' (eigenes Hotel fix), 'abteilung' und
-  // admin/leitung (Hotel per Dropdown wählbar) verwendet. Eigene,
-  // ungruppierte Artikelliste artikel_hotel, alphabetisch sortiert.
-  // -----------------------------------------------------------------
-  async function initHotelbestellungForm(container, { role, uid }) {
-    container.innerHTML = `<div class="card placeholder-card"><p>Formular wird geladen …</p></div>`;
-
-    const bestellschlussErreicht = await isBestellschlussErreicht("hotel");
-
-    let ownHotelName = null;
-    let hotelOptions = [];
-    if (role === "hotelrestaurant") {
-      try {
-        const userSnap = await getDoc(doc(db, "users", uid));
-        ownHotelName = userSnap.exists() ? userSnap.data().hotelName : null;
-      } catch (err) {
-        console.error(err);
-      }
-    } else {
-      try {
-        const q = query(collection(db, "users"), where("role", "==", "hotelrestaurant"));
-        const snap = await getDocs(q);
-        hotelOptions = snap.docs
-          .map((d) => ({ uid: d.id, ...d.data() }))
-          .filter((u) => u.active !== false)
-          .sort((a, b) => (a.hotelName || "").localeCompare(b.hotelName || "", "de"));
-      } catch (err) {
-        console.error(err);
-      }
-    }
-
-    let artikelListRaw = [];
-    try {
-      const snap = await getDocs(collection(db, "artikel_hotel"));
-      artikelListRaw = snap.docs
-        .map((d) => ({ id: d.id, ...d.data() }))
-        .filter((a) => a.aktiv)
-        .sort((a, b) => a.name.localeCompare(b.name, "de"));
-    } catch (err) {
-      console.error(err);
-    }
-
-    const artikelHtml = artikelListRaw.length === 0
-      ? `<p class="hint-text">Keine aktiven Artikel vorhanden. Bitte zuerst in den Einstellungen Artikel anlegen.</p>`
-      : artikelListRaw
-          .map(
-            (a) => `
-        <div class="list-row">
-          <span class="row-name">${escapeHtml(a.name)}</span>
-          <input type="number" min="0" step="1" placeholder="0" class="menge-input"
-                 data-artikel-id="${a.id}" data-artikel-name="${escapeHtml(a.name)}">
-        </div>`
-          )
-          .join("");
-
-    const minDate = tomorrowDateString();
-
-    container.innerHTML = `
-      <div class="card" style="padding:20px;">
-        ${bestellschlussErreicht ? `<div class="error-text" style="margin-bottom:14px;">Bestellschluss für heute erreicht – es kann aktuell keine Hotel/Restaurant-Bestellung mehr erstellt werden.</div>` : ""}
-        <form id="hf-form">
-          ${
-            role === "hotelrestaurant"
-              ? `<div class="field">
-                  <label>Hotel/Restaurant</label>
-                  <div class="static-value">${escapeHtml(ownHotelName || "–")}</div>
-                </div>`
-              : `<div class="field">
-                  <label for="hf-hotel-select">Hotel/Restaurant</label>
-                  <select id="hf-hotel-select" required>
-                    <option value="" disabled ${hotelOptions.length ? "selected" : ""}>Bitte wählen…</option>
-                    ${hotelOptions.map((h) => `<option value="${h.uid}">${escapeHtml(h.hotelName || h.name || h.uid)}</option>`).join("")}
-                  </select>
-                  ${hotelOptions.length === 0 ? `<p class="hint-text" style="margin-top:8px;">Keine Hotel/Restaurant-Accounts gefunden.</p>` : ""}
-                </div>`
-          }
-          <div class="field">
-            <label for="hf-liefertag">Liefertag</label>
-            <input type="date" id="hf-liefertag" min="${minDate}" value="${minDate}" required>
-          </div>
-          <div class="field">
-            <label>Artikel</label>
-            <div class="card" id="hf-artikel-liste">${artikelHtml}</div>
-          </div>
-          <div class="error-text" id="hf-error"></div>
-          <div id="hf-success" style="color:var(--color-success);font-size:13.5px;margin:-10px 0 14px;min-height:18px;"></div>
-          <button type="submit" class="btn btn-primary" id="hf-save-btn" style="width:100%;" ${bestellschlussErreicht ? "disabled" : ""}>
-            Bestellung speichern
-          </button>
-        </form>
+    <div class="subpanel" id="sub-auswertung">
+      <div class="subtabs" id="auswertung-subtabs">
+        <button data-auswsub="live" class="active">Live-Status</button>
+        <button data-auswsub="monat">Monatsübersicht</button>
+        <button data-auswsub="jahr">Jahresübersicht</button>
       </div>
-    `;
 
-    const form = container.querySelector("#hf-form");
-    const errorEl = container.querySelector("#hf-error");
-    const successEl = container.querySelector("#hf-success");
-    const saveBtn = container.querySelector("#hf-save-btn");
+      <div class="abw-subpanel active" id="ausw-sub-live">
+        <div class="field" style="max-width:260px;">
+          <label for="live-abteilung-select">Abteilung</label>
+          <select id="live-abteilung-select">
+            <option value="alle">Alle</option>
+            <option value="Bäckerei">Bäckerei</option>
+            <option value="Tearoom&Laden">Tearoom & Laden</option>
+            <option value="Dorfladen">Dorfladen</option>
+          </select>
+        </div>
+        <div id="live-status-list"></div>
+      </div>
 
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      errorEl.textContent = "";
-      successEl.textContent = "";
-
-      let hotelUid, hotelName;
-      if (role === "hotelrestaurant") {
-        hotelUid = uid;
-        hotelName = ownHotelName;
-      } else {
-        const select = container.querySelector("#hf-hotel-select");
-        hotelUid = select.value;
-        const match = hotelOptions.find((h) => h.uid === hotelUid);
-        hotelName = match ? match.hotelName : "";
-        if (!hotelUid) {
-          errorEl.textContent = "Bitte ein Hotel/Restaurant auswählen.";
-          return;
-        }
-      }
-
-      const liefertag = container.querySelector("#hf-liefertag").value;
-      if (!liefertag) {
-        errorEl.textContent = "Bitte einen Liefertag angeben.";
-        return;
-      }
-
-      const items = collectMengeItems(container);
-      if (items.length === 0) {
-        errorEl.textContent = "Bitte mindestens einen Artikel mit Menge grösser 0 angeben.";
-        return;
-      }
-
-      saveBtn.disabled = true;
-      saveBtn.textContent = "Speichert …";
-
-      try {
-        await addDoc(collection(db, "bestellungen_hotel"), {
-          hotelUid,
-          hotelName: hotelName || "",
-          liefertag,
-          items,
-          status: "offen",
-          erstelltAm: serverTimestamp(),
-        });
-        successEl.textContent = "Bestellung gespeichert.";
-        container.querySelectorAll(".menge-input").forEach((inp) => { inp.value = ""; });
-      } catch (err) {
-        console.error(err);
-        errorEl.textContent = "Fehler beim Speichern. Bitte erneut versuchen.";
-      } finally {
-        saveBtn.disabled = false;
-        saveBtn.textContent = "Bestellung speichern";
-      }
-    });
-  }
-
-  const TYPE_META = {
-    abteilung: { label: "Abteilung", badgeClass: "type-abteilung" },
-    kunde: { label: "Kunde", badgeClass: "type-kunde" },
-    hotel: { label: "Hotel/Restaurant", badgeClass: "type-hotel" },
-  };
-  const STATUS_META = {
-    offen: { label: "Offen", cls: "status-offen" },
-    in_verarbeitung: { label: "In Verarbeitung", cls: "status-in_verarbeitung" },
-  };
-
-  // -----------------------------------------------------------------
-  // Bestellungen-Übersicht.
-  // Kombiniert bestellungen_abteilung / _kunde / _hotel in einer Liste mit
-  // Typ-Badge. Sichtbarkeit je Rolle folgt den Firestore Security Rules:
-  // admin/leitung sehen alles, abteilung sieht eigene Abteilungs-/Kunden-
-  // bestellungen + alle Hotelbestellungen, hotelrestaurant nur eigene.
-  // In dieser Schicht: nur ansehen + löschen (admin/leitung); Bearbeiten
-  // folgt später.
-  // -----------------------------------------------------------------
-  function initBestellungenUebersicht(container, { role, uid }) {
-    container.innerHTML = "";
-    const listEl = document.createElement("div");
-    container.appendChild(listEl);
-    listEl.innerHTML = `<div class="card placeholder-card"><p>Bestellungen werden geladen …</p></div>`;
-
-    let dataAbteilung = [];
-    let dataKunde = [];
-    let dataHotel = [];
-    const loaded = { abteilung: false, kunde: false, hotel: false };
-
-    function render() {
-      if (!loaded.abteilung || !loaded.kunde || !loaded.hotel) return;
-
-      const all = [
-        ...dataAbteilung.map((o) => ({ ...o, __typ: "abteilung", __coll: "bestellungen_abteilung" })),
-        ...dataKunde.map((o) => ({ ...o, __typ: "kunde", __coll: "bestellungen_kunde" })),
-        ...dataHotel.map((o) => ({ ...o, __typ: "hotel", __coll: "bestellungen_hotel" })),
-      ];
-
-      if (all.length === 0) {
-        listEl.innerHTML = `<div class="card placeholder-card"><p>Noch keine Bestellungen vorhanden.</p></div>`;
-        return;
-      }
-
-      all.sort((a, b) => (a.liefertag || "").localeCompare(b.liefertag || ""));
-
-      const canDelete = role === "admin" || role === "leitung";
-
-      listEl.innerHTML = all
-        .map((o) => {
-          const typMeta = TYPE_META[o.__typ];
-          const statusMeta = STATUS_META[o.status] || { label: o.status || "–", cls: "" };
-          let titleLine;
-          if (o.__typ === "abteilung") {
-            titleLine = o.abteilung === "dorfladen" ? "Dorfladen" : "Tearoom & Laden";
-          } else if (o.__typ === "kunde") {
-            titleLine = `${escapeHtml(o.kundenName || "–")} · ${o.liefermethode === "lieferung" ? "Lieferung" : "Abholung"}`;
-          } else {
-            titleLine = escapeHtml(o.hotelName || "–");
-          }
-          const itemsSummary = o.items && o.items.length
-            ? o.items.map((it) => `${escapeHtml(it.artikelName)} × ${it.menge}`).join(", ")
-            : "Keine Artikel";
-
-          return `
-            <div class="card" style="padding:14px 16px;margin-bottom:10px;">
-              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
-                <div style="min-width:0;">
-                  <span class="type-badge ${typMeta.badgeClass}">${typMeta.label}</span>
-                  <div style="font-weight:700;font-size:15px;margin-top:6px;">${titleLine}</div>
-                  <div class="hint-text" style="margin-top:2px;">Liefertag: ${o.liefertag ? formatDateDe(o.liefertag) : "–"}</div>
-                </div>
-                <span class="status-tag ${statusMeta.cls}">${statusMeta.label}</span>
-              </div>
-              <div class="hint-text" style="margin-top:10px;">${itemsSummary}</div>
-              ${canDelete ? `<button type="button" class="btn btn-danger" data-action="delete" data-coll="${o.__coll}" data-id="${o.id}" style="margin-top:12px;padding:8px 14px;font-size:13px;">Löschen</button>` : ""}
+      <div class="abw-subpanel" id="ausw-sub-monat">
+        <div class="card form-card">
+          <div class="form-row-2">
+            <div class="field"><label for="uebersicht-von">Von</label><input type="date" id="uebersicht-von"></div>
+            <div class="field"><label for="uebersicht-bis">Bis</label><input type="date" id="uebersicht-bis"></div>
+          </div>
+          <div class="form-row-2">
+            <div class="field">
+              <label for="uebersicht-abteilung">Abteilung</label>
+              <select id="uebersicht-abteilung">
+                <option value="alle">Alle</option>
+                <option value="Bäckerei">Bäckerei</option>
+                <option value="Tearoom&Laden">Tearoom & Laden</option>
+                <option value="Dorfladen">Dorfladen</option>
+              </select>
             </div>
-          `;
-        })
-        .join("");
-    }
+            <div class="field">
+              <label for="uebersicht-mitarbeiter">Mitarbeiter</label>
+              <select id="uebersicht-mitarbeiter"><option value="alle">Alle</option></select>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="uebersicht-filter-btn" style="width:100%;">Filtern</button>
+        </div>
+        <div id="uebersicht-results"></div>
+      </div>
 
-    function watch(collName, filterField, matchesRole, key) {
-      const shouldSeeAll = role === "admin" || role === "leitung" || matchesRole === "all";
-      if (shouldSeeAll) {
-        onSnapshot(collection(db, collName), (snap) => {
-          if (key === "abteilung") dataAbteilung = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-          if (key === "kunde") dataKunde = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-          if (key === "hotel") dataHotel = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-          loaded[key] = true;
-          render();
-        });
-      } else if (matchesRole === role && filterField) {
-        onSnapshot(query(collection(db, collName), where(filterField, "==", uid)), (snap) => {
-          if (key === "abteilung") dataAbteilung = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-          if (key === "kunde") dataKunde = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-          if (key === "hotel") dataHotel = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-          loaded[key] = true;
-          render();
-        });
-      } else {
-        loaded[key] = true;
-        render();
-      }
-    }
+      <div class="abw-subpanel" id="ausw-sub-jahr">
+        <div class="card form-card">
+          <div class="form-row-2">
+            <div class="field">
+              <label for="jahr-select">Jahr</label>
+              <select id="jahr-select"></select>
+            </div>
+            <div class="field">
+              <label for="jahr-abteilung">Abteilung</label>
+              <select id="jahr-abteilung">
+                <option value="alle">Alle</option>
+                <option value="Bäckerei">Bäckerei</option>
+                <option value="Tearoom&Laden">Tearoom & Laden</option>
+                <option value="Dorfladen">Dorfladen</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="jahr-mitarbeiter">Mitarbeiter</label>
+            <select id="jahr-mitarbeiter"><option value="alle">Alle</option></select>
+          </div>
+          <button class="btn btn-primary" id="jahr-filter-btn" style="width:100%;">Filtern</button>
+        </div>
+        <button class="btn btn-secondary" id="jahr-pdf-btn" style="width:100%; margin-bottom:16px;">📄 Jahresüberblick als PDF (alle Mitarbeiter)</button>
+        <div id="jahr-results"></div>
+      </div>
+    </div>
 
-    // Abteilungsbestellungen: admin/leitung alles, abteilung nur eigene, hotelrestaurant nichts.
-    watch("bestellungen_abteilung", "erstelltVon", "abteilung", "abteilung");
-    // Kundenbestellungen: admin/leitung alles, abteilung nur eigene, hotelrestaurant nichts.
-    watch("bestellungen_kunde", "erstelltVon", "abteilung", "kunde");
-    // Hotelbestellungen: admin/leitung + abteilung sehen alles, hotelrestaurant nur eigene.
-    if (role === "hotelrestaurant") {
-      onSnapshot(query(collection(db, "bestellungen_hotel"), where("hotelUid", "==", uid)), (snap) => {
-        dataHotel = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        loaded.hotel = true;
-        render();
-      });
-    } else {
-      watch("bestellungen_hotel", null, "all", "hotel");
-    }
+    <div class="subpanel" id="sub-abwesenheiten">
+      <div class="subtabs" id="abwesenheiten-subtabs">
+        <button data-abwsub="ferienantraege" class="active">🌴 Ferienanträge</button>
+        <button data-abwsub="krank">🤒 Krank</button>
+        <button data-abwsub="unfall">🚑 Unfall</button>
+        <button data-abwsub="militaer">🎖️ Militär</button>
+        <button data-abwsub="schwangerschaft">🤰 Schwangerschaft</button>
+        <button data-abwsub="bezahlter_frei_tag">🎉 Bezahlter Frei Tag</button>
+      </div>
 
-    listEl.addEventListener("click", async (e) => {
-      const btn = e.target.closest('[data-action="delete"]');
-      if (!btn) return;
-      if (!confirm("Soll diese Bestellung wirklich gelöscht werden?")) return;
-      try {
-        await deleteDoc(doc(db, btn.dataset.coll, btn.dataset.id));
-      } catch (err) {
-        console.error(err);
-        alert("Fehler beim Löschen. Bitte erneut versuchen.");
-      }
-    });
-  }
+      <div class="abw-subpanel active" id="abw-sub-ferienantraege">
+        <div id="ferienantraege-admin-list"></div>
+      </div>
 
-  function renderSubtabView(containerId, subtabs, contentPrefix, customRenderers = {}) {
-    const container = document.getElementById(containerId);
-    const nav = document.createElement("div");
-    nav.className = "subtabs";
-    subtabs.forEach((st, i) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "subtab-btn" + (i === 0 ? " active" : "");
-      btn.textContent = st.label;
-      btn.dataset.subtab = st.id;
-      btn.addEventListener("click", () => {
-        nav.querySelectorAll(".subtab-btn").forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
-        container.querySelectorAll(".subtab-panel").forEach((p) => p.style.display = "none");
-        document.getElementById(`${contentPrefix}-${st.id}`).style.display = "block";
-      });
-      nav.appendChild(btn);
-    });
-    container.appendChild(nav);
+      <div class="abw-subpanel" id="abw-sub-simple">
+        <div class="card form-card">
+          <h3 class="section-title" id="abw-form-title" style="margin-top:0;">Neuen Eintrag erfassen</h3>
+          <div class="field"><label for="abw-mitarbeiter">Mitarbeiter</label><select id="abw-mitarbeiter"></select></div>
+          <div class="form-row-2">
+            <div class="field"><label for="abw-von">Von</label><input type="date" id="abw-von"></div>
+            <div class="field"><label for="abw-bis">Bis</label><input type="date" id="abw-bis"></div>
+          </div>
+          <div class="field"><label for="abw-bemerkung">Bemerkung</label><input type="text" id="abw-bemerkung"></div>
+          <span class="hint-text" id="abw-bemerkung-hint" style="display:none;">Diese Bemerkung wird im Arbeitsplan für alle sichtbar sein (z.B. "Hochzeit").</span>
+          <div class="error-text" id="abw-error"></div>
+          <div style="display:flex; gap:10px; margin-top:10px;">
+            <button class="btn btn-secondary" id="abw-cancel-edit-btn" style="display:none; flex:1;">Abbrechen</button>
+            <button class="btn btn-primary" id="abw-submit-btn" style="flex:1;">Eintragen</button>
+          </div>
+        </div>
+        <div id="abw-simple-list"></div>
+      </div>
+    </div>
 
-    subtabs.forEach((st, i) => {
-      const panel = document.createElement("div");
-      panel.className = "subtab-panel";
-      panel.id = `${contentPrefix}-${st.id}`;
-      panel.style.display = i === 0 ? "block" : "none";
-      if (customRenderers[st.id]) {
-        customRenderers[st.id](panel);
-      } else {
-        panel.innerHTML = placeholderCard(`${st.label} – wird in Schicht 2 gebaut.`);
-      }
-      container.appendChild(panel);
-    });
-  }
+    <div class="subpanel" id="sub-planung">
+      <div class="month-nav">
+        <button id="woche-prev-admin" class="month-nav-btn">‹</button>
+        <span class="month-label" id="woche-label-admin">–</span>
+        <button id="woche-next-admin" class="month-nav-btn">›</button>
+      </div>
+      <div id="planung-content"></div>
+    </div>
 
-  function buildViews(tabs, role, uid) {
-    const main = document.getElementById("main-content");
-    main.innerHTML = "";
+    <div class="subpanel" id="sub-einstellungen">
+      <div class="settings-card" id="grundeinstellungen-card">
+        <h4>Grundeinstellungen</h4>
+        <div class="field">
+          <label for="wochenstunden100">Wochenstunden bei 100% Anstellung</label>
+          <input type="number" id="wochenstunden100" step="0.1" min="1" max="60">
+        </div>
+        <div class="field">
+          <label for="ferientage-jahr">Ferientage pro Jahr (bei 100%)</label>
+          <input type="number" id="ferientage-jahr" step="0.5" min="1" max="60">
+        </div>
+        <div class="field">
+          <label for="sperrfrist-wochen">Sperrfrist für Ferien/Frei-Wünsche (Wochen im Voraus)</label>
+          <input type="number" id="sperrfrist-wochen" step="1" min="0" max="52">
+          <span class="hint-text">Mitarbeitende können innerhalb dieser Frist keine neuen Ferien oder Frei-Wünsche mehr beantragen. Admin/Leitung sind davon ausgenommen. 0 = keine Sperrfrist.</span>
+        </div>
+        <button class="btn btn-primary" id="save-grundeinstellungen-btn" style="width:100%; margin-bottom:18px;">Speichern</button>
+      </div>
 
-    tabs.forEach((tab, i) => {
-      const view = document.createElement("section");
-      view.className = "view" + (i === 0 ? " active" : "");
-      view.id = `view-${tab.id}`;
+      <div class="settings-card">
+        <h4>Ferien-Sperrzeiträume</h4>
+        <span class="hint-text" style="display:block; margin-bottom:12px;">In diesen Zeiträumen können Mitarbeitende keine Ferien beantragen (z.B. Hochsaison). Frei-Wünsche sind davon nicht betroffen. Admin/Leitung sind ausgenommen.</span>
+        <div id="feriensperre-list"></div>
+        <div class="inline-add-row">
+          <div class="field"><label for="new-feriensperre-von">Von</label><input type="date" id="new-feriensperre-von"></div>
+          <div class="field"><label for="new-feriensperre-bis">Bis</label><input type="date" id="new-feriensperre-bis"></div>
+          <div class="field"><label for="new-feriensperre-name">Bezeichnung</label><input type="text" id="new-feriensperre-name" placeholder="z.B. Weihnachtsgeschäft"></div>
+        </div>
+        <button class="btn btn-secondary" id="add-feriensperre-btn" style="width:100%; margin: 10px 0 18px;">Sperrzeitraum hinzufügen</button>
+      </div>
 
-      const title = document.createElement("div");
-      title.className = "view-title";
-      title.textContent = tab.label;
-      view.appendChild(title);
+      <div class="settings-card">
+        <h4>Feiertage Kanton Bern</h4>
+        <div class="field" style="max-width:160px;">
+          <label for="holiday-year-select">Jahr</label>
+          <select id="holiday-year-select"></select>
+        </div>
+        <div id="holiday-list"></div>
+        <div class="inline-add-row">
+          <div class="field"><input type="date" id="new-holiday-date"></div>
+          <div class="field"><input type="text" id="new-holiday-name" placeholder="Bezeichnung"></div>
+        </div>
+        <button class="btn btn-secondary" id="add-holiday-btn" style="width:100%; margin: 10px 0 18px;">Feiertag hinzufügen</button>
+      </div>
+    </div>
+  </section>
 
-      if (tab.id === "erstellen") {
-        main.appendChild(view);
-        renderSubtabView(`view-${tab.id}`, ERSTELLEN_SUBTABS, "erstellen", {
-          "abteilung": (panel) => initAbteilungsbestellungForm(panel, { role, uid }),
-          "kunde": (panel) => initKundenbestellungForm(panel, { role, uid }),
-          "hotel": (panel) => initHotelbestellungForm(panel, { role, uid }),
-        });
-      } else if (tab.id === "einstellungen") {
-        main.appendChild(view);
-        renderSubtabView(`view-${tab.id}`, EINSTELLUNGEN_SUBTABS, "einstellungen", {
-          "artikel-abteilung": initArtikelAbteilungPanel,
-          "artikel-hotel": initArtikelHotelPanel,
-          "bestellschluss": initBestellschlussPanel,
-        });
-      } else if (tab.id === "bestellungen") {
-        const body = document.createElement("div");
-        view.appendChild(body);
-        main.appendChild(view);
-        initBestellungenUebersicht(body, { role, uid });
-      } else if (tab.id === "neu-abteilung") {
-        const body = document.createElement("div");
-        view.appendChild(body);
-        main.appendChild(view);
-        initAbteilungsbestellungForm(body, { role, uid });
-      } else if (tab.id === "neu-kunde") {
-        const body = document.createElement("div");
-        view.appendChild(body);
-        main.appendChild(view);
-        initKundenbestellungForm(body, { role, uid });
-      } else if (tab.id === "neu-hotel" || tab.id === "neu") {
-        const body = document.createElement("div");
-        view.appendChild(body);
-        main.appendChild(view);
-        initHotelbestellungForm(body, { role, uid });
-      } else {
-        const body = document.createElement("div");
-        body.innerHTML = placeholderCard(VIEW_PLACEHOLDERS[tab.id] || "Kommt in einer späteren Schicht.");
-        view.appendChild(body);
-        main.appendChild(view);
-      }
-    });
-  }
+</main>
 
-  function buildTabbar(tabs) {
-    const bar = document.getElementById("tabbar");
-    bar.innerHTML = "";
-    tabs.forEach((tab, i) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "tab-btn" + (i === 0 ? " active" : "");
-      btn.dataset.tab = tab.id;
-      btn.innerHTML = `<span class="dot"></span><span>${tab.label}</span>`;
-      btn.addEventListener("click", () => {
-        bar.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
-        document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
-        document.getElementById(`view-${tab.id}`).classList.add("active");
-        window.scrollTo({ top: 0, behavior: "instant" });
-      });
-      bar.appendChild(btn);
-    });
-  }
+<!-- Modal: Ferienantrag genehmigen/ablehnen -->
+<div class="modal-backdrop" id="ferien-decision-modal">
+  <div class="modal-sheet">
+    <h3 id="ferien-decision-title">Ferienantrag genehmigen</h3>
+    <div class="field">
+      <label for="ferien-decision-begruendung" id="ferien-decision-label">Bemerkung (optional)</label>
+      <input type="text" id="ferien-decision-begruendung">
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-secondary" id="ferien-decision-cancel">Abbrechen</button>
+      <button type="button" class="btn btn-primary" id="ferien-decision-ok">Bestätigen</button>
+    </div>
+  </div>
+</div>
 
-  function initApp(role, name, uid) {
-    const tabs = TABS_BY_ROLE[role] || TABS_BY_ROLE.abteilung;
+<!-- Modal: Ein-/Ausstempeln bestätigen -->
+<div class="modal-backdrop" id="stempel-confirm-modal">
+  <div class="modal-sheet">
+    <h3 id="stempel-confirm-title">Bestätigen</h3>
+    <p id="stempel-confirm-text" style="color: var(--color-text-muted); margin: -10px 0 20px;"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-secondary" id="stempel-confirm-cancel">Abbrechen</button>
+      <button type="button" class="btn btn-primary" id="stempel-confirm-ok">Bestätigen</button>
+    </div>
+  </div>
+</div>
 
-    document.getElementById("user-name").textContent = name || "–";
+<!-- Modal: Mitarbeiter anlegen/bearbeiten -->
+<!-- Modal: Schicht eintragen/bearbeiten -->
+<div class="modal-backdrop" id="shift-modal">
+  <div class="modal-sheet">
+    <h3 id="shift-modal-title">Schicht eintragen</h3>
+    <form id="shift-form">
+      <div class="field">
+        <label for="shift-mitarbeiter">Mitarbeitende/r</label>
+        <select id="shift-mitarbeiter" required></select>
+      </div>
+      <div class="field">
+        <label for="shift-abteilung">Abteilung</label>
+        <select id="shift-abteilung" required>
+          <option value="Bäckerei">Bäckerei</option>
+          <option value="Tearoom&Laden">Tearoom & Laden</option>
+          <option value="Dorfladen">Dorfladen</option>
+        </select>
+      </div>
+      <div class="form-row-2">
+        <div class="field"><label for="shift-von">Von</label><input type="time" id="shift-von" required></div>
+        <div class="field"><label for="shift-bis">Bis</label><input type="time" id="shift-bis" required></div>
+      </div>
+      <div class="field">
+        <label for="shift-bemerkung">Bemerkung (optional)</label>
+        <input type="text" id="shift-bemerkung" placeholder="z.B. Vertretung">
+      </div>
+      <div class="error-text" id="shift-error"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="shift-cancel-btn">Abbrechen</button>
+        <button type="submit" class="btn btn-primary" id="shift-save-btn">Speichern</button>
+      </div>
+    </form>
+  </div>
+</div>
 
-    buildViews(tabs, role, uid);
-    buildTabbar(tabs);
+<!-- Modal: Mitarbeiter-Detail (Übersicht) -->
+<div class="modal-backdrop" id="detail-modal">
+  <div class="modal-sheet">
+    <h3 id="detail-modal-title">Mitarbeiter</h3>
+    <button class="btn btn-primary" id="detail-add-manual-btn" style="width:100%; margin-bottom:16px;">+ Eintrag manuell hinzufügen</button>
 
-    document.getElementById("loading-screen").style.display = "none";
-    document.getElementById("app-shell").style.display = "block";
-  }
+    <div id="detail-manual-form" style="display:none; margin-bottom:18px;">
+      <div class="field"><label for="manual-datum">Datum</label><input type="date" id="manual-datum"></div>
+      <div class="form-row-2">
+        <div class="field"><label for="manual-von">Von</label><input type="time" id="manual-von"></div>
+        <div class="field"><label for="manual-bis">Bis</label><input type="time" id="manual-bis"></div>
+      </div>
+      <div class="form-row-2">
+        <div class="field"><label for="manual-pause-von">Pause von (optional)</label><input type="time" id="manual-pause-von"></div>
+        <div class="field"><label for="manual-pause-bis">Pause bis (optional)</label><input type="time" id="manual-pause-bis"></div>
+      </div>
+      <div class="error-text" id="manual-error"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="manual-cancel-btn">Abbrechen</button>
+        <button type="button" class="btn btn-primary" id="manual-save-btn">Speichern</button>
+      </div>
+    </div>
 
-  // -----------------------------------------------------------------
-  // Auth-Check: nicht eingeloggt -> zurück zum Login.
-  // Rolle/Name kommen aus sessionStorage (von index.html gesetzt);
-  // falls nicht vorhanden (z.B. Seite neu geöffnet), aus Firestore nachladen.
-  // -----------------------------------------------------------------
-  onAuthStateChanged(auth, async (user) => {
-    if (!user) {
-      window.location.href = "index.html";
-      return;
-    }
+    <div id="detail-shift-list"></div>
 
-    let role = sessionStorage.getItem("marmotte_role");
-    let name = sessionStorage.getItem("marmotte_name");
+    <button class="btn btn-secondary" id="detail-close-btn" style="width:100%; margin-top:16px;">Schliessen</button>
+  </div>
+</div>
 
-    if (!role) {
-      try {
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (!userDoc.exists()) {
-          await signOut(auth);
-          window.location.href = "index.html";
-          return;
-        }
-        const data = userDoc.data();
-        if (data.active === false) {
-          await signOut(auth);
-          window.location.href = "index.html";
-          return;
-        }
-        role = data.role || "abteilung";
-        name = data.name || "";
-        sessionStorage.setItem("marmotte_role", role);
-        sessionStorage.setItem("marmotte_name", name);
-      } catch (err) {
-        console.error(err);
-        window.location.href = "index.html";
-        return;
-      }
-    }
-
-    initApp(role, name, user.uid);
-  });
-
-  document.getElementById("logout-btn").addEventListener("click", async () => {
-    await signOut(auth);
-    sessionStorage.removeItem("marmotte_role");
-    sessionStorage.removeItem("marmotte_name");
-    window.location.href = "index.html";
-  });
-
-  // Service Worker registrieren (falls noch nicht aktiv, z.B. Direktaufruf von app.html)
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("./sw.js").catch((err) => {
-        console.warn("Service Worker konnte nicht registriert werden:", err);
-      });
-    });
-  }
-</script>
-
+<script type="module" src="app.js"></script>
 </body>
 </html>
