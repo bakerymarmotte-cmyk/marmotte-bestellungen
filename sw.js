@@ -9,8 +9,8 @@ const CACHE_PREFIX = "marmotte-bestellungen-";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 // Kernseiten und -dateien, die beim Installieren vorab gecacht werden.
-// app.html / change-password.html werden hier mit aufgenommen, auch wenn
-// sie nicht Teil dieses Uploads sind, da sie live im Repo existieren.
+// change-password.html fehlt hier bewusst: die Seite existiert noch nicht.
+// Sobald sie im Repo liegt, hier ergaenzen.
 //
 // Design-System: tokens.css/components.css kommen aus dem Repo marmotte-design
 // auf derselben Origin. Sie werden vorab gecacht (damit die App offline nicht
@@ -23,22 +23,22 @@ const PRECACHE_URLS = [
   "./",
   "./index.html",
   "./app.html",
-  "./change-password.html",
   "./style.css",
   "./firebase-config.js",
   "./manifest.json",
   `${DESIGN_BASE}tokens.css`,
   `${DESIGN_BASE}components.css`,
-  "./assets/icon192.png",
-  "./assets/icon512.png",
-  "./assets/iconmaskable192.png",
-  "./assets/iconmaskable512.png",
-  "./assets/appletouchicon120.png",
-  "./assets/appletouchicon152.png",
-  "./assets/appletouchicon167.png",
-  "./assets/appletouchicon180.png",
-  "./assets/tile150.png",
-  "./assets/tile310.png",
+  "./assets/favicon.ico",
+  "./assets/icon-192.png",
+  "./assets/icon-512.png",
+  "./assets/icon-maskable-192.png",
+  "./assets/icon-maskable-512.png",
+  "./assets/apple-touch-icon-120.png",
+  "./assets/apple-touch-icon-152.png",
+  "./assets/apple-touch-icon-167.png",
+  "./assets/apple-touch-icon-180.png",
+  "./assets/tile-150.png",
+  "./assets/tile-310.png",
 ];
 
 // Installation: Kern-Dateien in den Cache legen.
