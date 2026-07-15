@@ -295,6 +295,40 @@
   }
   .status-tag.status-offen { background: rgba(253, 214, 0, 0.12); color: var(--color-yellow); }
   .status-tag.status-in_verarbeitung { background: rgba(76, 175, 125, 0.15); color: var(--color-success); }
+
+  /* ---------- Modal (Bestellung bearbeiten) ---------- */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 50;
+  }
+  .modal-panel {
+    background: var(--color-bg);
+    width: 100%;
+    max-width: 640px;
+    max-height: 90vh;
+    overflow-y: auto;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--color-border);
+    position: sticky;
+    top: 0;
+    background: var(--color-bg);
+    font-weight: 700;
+    font-size: 15px;
+    z-index: 1;
+  }
+  .modal-body { padding: 16px; }
 </style>
 </head>
 <body>
@@ -330,7 +364,7 @@
   import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import {
     doc, getDoc, getDocs, setDoc, collection, addDoc, updateDoc, deleteDoc,
-    onSnapshot, serverTimestamp, query, where,
+    onSnapshot, serverTimestamp, query, where, deleteField,
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   // ---------------------------------------------------------------------
@@ -901,10 +935,11 @@
   // Wird sowohl von Rolle 'abteilung' (eigene Abteilung fix) als auch von
   // admin/leitung (Abteilung per Dropdown wählbar) verwendet.
   // -----------------------------------------------------------------
-  async function initAbteilungsbestellungForm(container, { role, uid }) {
+  async function initAbteilungsbestellungForm(container, { role, uid, existing = null, onSaved = null }) {
     container.innerHTML = `<div class="card placeholder-card"><p>Formular wird geladen …</p></div>`;
 
-    const bestellschlussErreicht = await isBestellschlussErreicht("abteilung");
+    const isEdit = !!existing;
+    const bestellschlussErreicht = (role !== "admin" && role !== "leitung") && await isBestellschlussErreicht("abteilung");
 
     let ownAbteilung = null;
     if (role === "abteilung") {
@@ -918,26 +953,28 @@
 
     const { artikelListRaw, gruppen } = await loadArtikelAbteilungGrouped();
     const artikelHtml = renderArtikelAuswahlHtml(artikelListRaw, gruppen);
+    const liefertagAnzeige = isEdit ? existing.liefertag : tomorrowDateString();
+    const abteilungWert = isEdit ? existing.abteilung : ownAbteilung;
 
     container.innerHTML = `
       <div class="card" style="padding:20px;">
-        ${bestellschlussErreicht ? `<div class="error-text" style="margin-bottom:14px;">Bestellschluss für heute erreicht – es kann aktuell keine Abteilungsbestellung mehr erstellt werden.</div>` : ""}
+        ${bestellschlussErreicht ? `<div class="error-text" style="margin-bottom:14px;">Bestellschluss für heute erreicht – es kann aktuell keine Abteilungsbestellung mehr ${isEdit ? "geändert" : "erstellt"} werden.</div>` : ""}
         <form id="af-form">
           <div class="field">
             <label>Lieferung</label>
-            <div class="static-value">Morgen, ${formatDateDe(tomorrowDateString())}</div>
+            <div class="static-value">${isEdit ? "" : "Morgen, "}${formatDateDe(liefertagAnzeige)}</div>
           </div>
           ${
             role === "abteilung"
               ? `<div class="field">
                   <label>Abteilung</label>
-                  <div class="static-value">${ownAbteilung === "dorfladen" ? "Dorfladen" : "Tearoom & Laden"}</div>
+                  <div class="static-value">${abteilungWert === "dorfladen" ? "Dorfladen" : "Tearoom & Laden"}</div>
                 </div>`
               : `<div class="field">
                   <label for="af-abteilung-select">Abteilung</label>
                   <select id="af-abteilung-select" required>
-                    <option value="tearoom_laden">Tearoom &amp; Laden</option>
-                    <option value="dorfladen">Dorfladen</option>
+                    <option value="tearoom_laden" ${abteilungWert === "tearoom_laden" ? "selected" : ""}>Tearoom &amp; Laden</option>
+                    <option value="dorfladen" ${abteilungWert === "dorfladen" ? "selected" : ""}>Dorfladen</option>
                   </select>
                 </div>`
           }
@@ -948,11 +985,18 @@
           <div class="error-text" id="af-error"></div>
           <div id="af-success" style="color:var(--color-success);font-size:13.5px;margin:-10px 0 14px;min-height:18px;"></div>
           <button type="submit" class="btn btn-primary" id="af-save-btn" style="width:100%;" ${bestellschlussErreicht ? "disabled" : ""}>
-            Bestellung speichern
+            ${isEdit ? "Änderungen speichern" : "Bestellung speichern"}
           </button>
         </form>
       </div>
     `;
+
+    if (isEdit && existing.items) {
+      existing.items.forEach((it) => {
+        const inp = container.querySelector(`.menge-input[data-artikel-id="${it.artikelId}"]`);
+        if (inp) inp.value = it.menge;
+      });
+    }
 
     const form = container.querySelector("#af-form");
     const errorEl = container.querySelector("#af-error");
@@ -983,22 +1027,31 @@
       saveBtn.textContent = "Speichert …";
 
       try {
-        await addDoc(collection(db, "bestellungen_abteilung"), {
-          abteilung: abteilungValue,
-          liefertag: tomorrowDateString(),
-          items,
-          status: "offen",
-          erstelltVon: uid,
-          erstelltAm: serverTimestamp(),
-        });
-        successEl.textContent = "Bestellung gespeichert.";
-        container.querySelectorAll(".menge-input").forEach((inp) => { inp.value = ""; });
+        if (isEdit) {
+          await updateDoc(doc(db, "bestellungen_abteilung", existing.id), {
+            abteilung: abteilungValue,
+            items,
+          });
+          successEl.textContent = "Änderungen gespeichert.";
+          if (onSaved) setTimeout(onSaved, 600);
+        } else {
+          await addDoc(collection(db, "bestellungen_abteilung"), {
+            abteilung: abteilungValue,
+            liefertag: tomorrowDateString(),
+            items,
+            status: "offen",
+            erstelltVon: uid,
+            erstelltAm: serverTimestamp(),
+          });
+          successEl.textContent = "Bestellung gespeichert.";
+          container.querySelectorAll(".menge-input").forEach((inp) => { inp.value = ""; });
+        }
       } catch (err) {
         console.error(err);
         errorEl.textContent = "Fehler beim Speichern. Bitte erneut versuchen.";
       } finally {
         saveBtn.disabled = false;
-        saveBtn.textContent = "Bestellung speichern";
+        saveBtn.textContent = isEdit ? "Änderungen speichern" : "Bestellung speichern";
       }
     });
   }
@@ -1008,45 +1061,47 @@
   // Wird von Rolle 'abteilung' (Kunde ruft an/mailt/steht im Laden) und von
   // admin/leitung erfasst. Teilt sich die Artikelliste mit der Abteilung.
   // -----------------------------------------------------------------
-  async function initKundenbestellungForm(container, { role, uid }) {
+  async function initKundenbestellungForm(container, { role, uid, existing = null, onSaved = null }) {
     container.innerHTML = `<div class="card placeholder-card"><p>Formular wird geladen …</p></div>`;
 
-    const bestellschlussErreicht = await isBestellschlussErreicht("kunde");
+    const isEdit = !!existing;
+    const bestellschlussErreicht = (role !== "admin" && role !== "leitung") && await isBestellschlussErreicht("kunde");
     const { artikelListRaw, gruppen } = await loadArtikelAbteilungGrouped();
     const artikelHtml = renderArtikelAuswahlHtml(artikelListRaw, gruppen);
     const todayStr = todayDateString();
+    const liefertagWert = isEdit ? existing.liefertag : todayStr;
 
     container.innerHTML = `
       <div class="card" style="padding:20px;">
-        ${bestellschlussErreicht ? `<div class="error-text" style="margin-bottom:14px;">Bestellschluss für heute erreicht – es können aktuell keine neuen Kundenbestellungen erstellt werden.</div>` : ""}
+        ${bestellschlussErreicht ? `<div class="error-text" style="margin-bottom:14px;">Bestellschluss für heute erreicht – es können aktuell keine Kundenbestellungen mehr ${isEdit ? "geändert" : "erstellt"} werden.</div>` : ""}
         <form id="kf-form">
           <div class="field">
             <label for="kf-kundenname">Kundenname</label>
-            <input type="text" id="kf-kundenname" required>
+            <input type="text" id="kf-kundenname" value="${isEdit ? escapeHtml(existing.kundenName || "") : ""}" required>
           </div>
           <div class="field">
             <label for="kf-liefertag">Liefertag</label>
-            <input type="date" id="kf-liefertag" min="${todayStr}" value="${todayStr}" required>
+            <input type="date" id="kf-liefertag" min="${todayStr}" value="${liefertagWert}" required>
           </div>
           <div class="field">
             <label for="kf-liefermethode">Liefermethode</label>
             <select id="kf-liefermethode">
-              <option value="abholung">Abholung</option>
-              <option value="lieferung">Lieferung</option>
+              <option value="abholung" ${isEdit && existing.liefermethode !== "lieferung" ? "selected" : ""}>Abholung</option>
+              <option value="lieferung" ${isEdit && existing.liefermethode === "lieferung" ? "selected" : ""}>Lieferung</option>
             </select>
           </div>
-          <div id="kf-lieferfelder" style="display:none;">
+          <div id="kf-lieferfelder" style="display:${isEdit && existing.liefermethode === "lieferung" ? "block" : "none"};">
             <div class="field">
               <label for="kf-adresse">Rechnungsadresse</label>
-              <textarea id="kf-adresse" rows="3" style="width:100%;background:var(--color-surface-raised);border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:12px 14px;color:var(--color-text);font-size:15px;font-family:var(--font-body);resize:vertical;"></textarea>
+              <textarea id="kf-adresse" rows="3" style="width:100%;background:var(--color-surface-raised);border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:12px 14px;color:var(--color-text);font-size:15px;font-family:var(--font-body);resize:vertical;">${isEdit ? escapeHtml(existing.rechnungsadresse || "") : ""}</textarea>
             </div>
             <div class="field">
               <label for="kf-telefon">Telefon</label>
-              <input type="tel" id="kf-telefon">
+              <input type="tel" id="kf-telefon" value="${isEdit ? escapeHtml(existing.telefon || "") : ""}">
             </div>
             <div class="field">
               <label for="kf-email">E-Mail</label>
-              <input type="email" id="kf-email">
+              <input type="email" id="kf-email" value="${isEdit ? escapeHtml(existing.email || "") : ""}">
             </div>
           </div>
           <div class="field">
@@ -1056,11 +1111,18 @@
           <div class="error-text" id="kf-error"></div>
           <div id="kf-success" style="color:var(--color-success);font-size:13.5px;margin:-10px 0 14px;min-height:18px;"></div>
           <button type="submit" class="btn btn-primary" id="kf-save-btn" style="width:100%;" ${bestellschlussErreicht ? "disabled" : ""}>
-            Bestellung speichern
+            ${isEdit ? "Änderungen speichern" : "Bestellung speichern"}
           </button>
         </form>
       </div>
     `;
+
+    if (isEdit && existing.items) {
+      existing.items.forEach((it) => {
+        const inp = container.querySelector(`.menge-input[data-artikel-id="${it.artikelId}"]`);
+        if (inp) inp.value = it.menge;
+      });
+    }
 
     const form = container.querySelector("#kf-form");
     const methodeSelect = container.querySelector("#kf-liefermethode");
@@ -1116,32 +1178,48 @@
       saveBtn.textContent = "Speichert …";
 
       try {
-        const payload = {
-          kundenName,
-          liefertag,
-          liefermethode,
-          items,
-          status: "offen",
-          erstelltVon: uid,
-          erstelltAm: serverTimestamp(),
-        };
-        if (liefermethode === "lieferung") {
-          payload.rechnungsadresse = rechnungsadresse;
-          payload.telefon = telefon;
-          payload.email = email;
+        if (isEdit) {
+          const payload = { kundenName, liefertag, liefermethode, items };
+          if (liefermethode === "lieferung") {
+            payload.rechnungsadresse = rechnungsadresse;
+            payload.telefon = telefon;
+            payload.email = email;
+          } else {
+            payload.rechnungsadresse = deleteField();
+            payload.telefon = deleteField();
+            payload.email = deleteField();
+          }
+          await updateDoc(doc(db, "bestellungen_kunde", existing.id), payload);
+          successEl.textContent = "Änderungen gespeichert.";
+          if (onSaved) setTimeout(onSaved, 600);
+        } else {
+          const payload = {
+            kundenName,
+            liefertag,
+            liefermethode,
+            items,
+            status: "offen",
+            erstelltVon: uid,
+            erstelltAm: serverTimestamp(),
+          };
+          if (liefermethode === "lieferung") {
+            payload.rechnungsadresse = rechnungsadresse;
+            payload.telefon = telefon;
+            payload.email = email;
+          }
+          await addDoc(collection(db, "bestellungen_kunde"), payload);
+          successEl.textContent = "Bestellung gespeichert.";
+          form.reset();
+          lieferfelder.style.display = "none";
+          container.querySelectorAll(".menge-input").forEach((inp) => { inp.value = ""; });
+          container.querySelector("#kf-liefertag").value = todayStr;
         }
-        await addDoc(collection(db, "bestellungen_kunde"), payload);
-        successEl.textContent = "Bestellung gespeichert.";
-        form.reset();
-        lieferfelder.style.display = "none";
-        container.querySelectorAll(".menge-input").forEach((inp) => { inp.value = ""; });
-        container.querySelector("#kf-liefertag").value = todayStr;
       } catch (err) {
         console.error(err);
         errorEl.textContent = "Fehler beim Speichern. Bitte erneut versuchen.";
       } finally {
         saveBtn.disabled = false;
-        saveBtn.textContent = "Bestellung speichern";
+        saveBtn.textContent = isEdit ? "Änderungen speichern" : "Bestellung speichern";
       }
     });
   }
@@ -1152,10 +1230,11 @@
   // admin/leitung (Hotel per Dropdown wählbar) verwendet. Eigene,
   // ungruppierte Artikelliste artikel_hotel, alphabetisch sortiert.
   // -----------------------------------------------------------------
-  async function initHotelbestellungForm(container, { role, uid }) {
+  async function initHotelbestellungForm(container, { role, uid, existing = null, onSaved = null }) {
     container.innerHTML = `<div class="card placeholder-card"><p>Formular wird geladen …</p></div>`;
 
-    const bestellschlussErreicht = await isBestellschlussErreicht("hotel");
+    const isEdit = !!existing;
+    const bestellschlussErreicht = (role !== "admin" && role !== "leitung") && await isBestellschlussErreicht("hotel");
 
     let ownHotelName = null;
     let hotelOptions = [];
@@ -1204,10 +1283,11 @@
           .join("");
 
     const minDate = tomorrowDateString();
+    const liefertagWert = isEdit ? existing.liefertag : minDate;
 
     container.innerHTML = `
       <div class="card" style="padding:20px;">
-        ${bestellschlussErreicht ? `<div class="error-text" style="margin-bottom:14px;">Bestellschluss für heute erreicht – es kann aktuell keine Hotel/Restaurant-Bestellung mehr erstellt werden.</div>` : ""}
+        ${bestellschlussErreicht ? `<div class="error-text" style="margin-bottom:14px;">Bestellschluss für heute erreicht – es kann aktuell keine Hotel/Restaurant-Bestellung mehr ${isEdit ? "geändert" : "erstellt"} werden.</div>` : ""}
         <form id="hf-form">
           ${
             role === "hotelrestaurant"
@@ -1218,15 +1298,15 @@
               : `<div class="field">
                   <label for="hf-hotel-select">Hotel/Restaurant</label>
                   <select id="hf-hotel-select" required>
-                    <option value="" disabled ${hotelOptions.length ? "selected" : ""}>Bitte wählen…</option>
-                    ${hotelOptions.map((h) => `<option value="${h.uid}">${escapeHtml(h.hotelName || h.name || h.uid)}</option>`).join("")}
+                    <option value="" disabled ${!isEdit && hotelOptions.length ? "selected" : ""}>Bitte wählen…</option>
+                    ${hotelOptions.map((h) => `<option value="${h.uid}" ${isEdit && existing.hotelUid === h.uid ? "selected" : ""}>${escapeHtml(h.hotelName || h.name || h.uid)}</option>`).join("")}
                   </select>
                   ${hotelOptions.length === 0 ? `<p class="hint-text" style="margin-top:8px;">Keine Hotel/Restaurant-Accounts gefunden.</p>` : ""}
                 </div>`
           }
           <div class="field">
             <label for="hf-liefertag">Liefertag</label>
-            <input type="date" id="hf-liefertag" min="${minDate}" value="${minDate}" required>
+            <input type="date" id="hf-liefertag" min="${minDate}" value="${liefertagWert}" required>
           </div>
           <div class="field">
             <label>Artikel</label>
@@ -1235,11 +1315,18 @@
           <div class="error-text" id="hf-error"></div>
           <div id="hf-success" style="color:var(--color-success);font-size:13.5px;margin:-10px 0 14px;min-height:18px;"></div>
           <button type="submit" class="btn btn-primary" id="hf-save-btn" style="width:100%;" ${bestellschlussErreicht ? "disabled" : ""}>
-            Bestellung speichern
+            ${isEdit ? "Änderungen speichern" : "Bestellung speichern"}
           </button>
         </form>
       </div>
     `;
+
+    if (isEdit && existing.items) {
+      existing.items.forEach((it) => {
+        const inp = container.querySelector(`.menge-input[data-artikel-id="${it.artikelId}"]`);
+        if (inp) inp.value = it.menge;
+      });
+    }
 
     const form = container.querySelector("#hf-form");
     const errorEl = container.querySelector("#hf-error");
@@ -1282,22 +1369,33 @@
       saveBtn.textContent = "Speichert …";
 
       try {
-        await addDoc(collection(db, "bestellungen_hotel"), {
-          hotelUid,
-          hotelName: hotelName || "",
-          liefertag,
-          items,
-          status: "offen",
-          erstelltAm: serverTimestamp(),
-        });
-        successEl.textContent = "Bestellung gespeichert.";
-        container.querySelectorAll(".menge-input").forEach((inp) => { inp.value = ""; });
+        if (isEdit) {
+          await updateDoc(doc(db, "bestellungen_hotel", existing.id), {
+            hotelUid,
+            hotelName: hotelName || "",
+            liefertag,
+            items,
+          });
+          successEl.textContent = "Änderungen gespeichert.";
+          if (onSaved) setTimeout(onSaved, 600);
+        } else {
+          await addDoc(collection(db, "bestellungen_hotel"), {
+            hotelUid,
+            hotelName: hotelName || "",
+            liefertag,
+            items,
+            status: "offen",
+            erstelltAm: serverTimestamp(),
+          });
+          successEl.textContent = "Bestellung gespeichert.";
+          container.querySelectorAll(".menge-input").forEach((inp) => { inp.value = ""; });
+        }
       } catch (err) {
         console.error(err);
         errorEl.textContent = "Fehler beim Speichern. Bitte erneut versuchen.";
       } finally {
         saveBtn.disabled = false;
-        saveBtn.textContent = "Bestellung speichern";
+        saveBtn.textContent = isEdit ? "Änderungen speichern" : "Bestellung speichern";
       }
     });
   }
@@ -1313,13 +1411,36 @@
   };
 
   // -----------------------------------------------------------------
+  // Modal-Overlay für das Bearbeiten einer Bestellung. Öffnet das jeweilige
+  // Formular (gleiche Funktion wie beim Erstellen) vorausgefüllt.
+  // -----------------------------------------------------------------
+  function openEditModal(renderFn) {
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.innerHTML = `
+      <div class="modal-panel">
+        <div class="modal-header">
+          <span>Bestellung bearbeiten</span>
+          <button type="button" class="icon-btn" id="modal-close-btn">✕</button>
+        </div>
+        <div class="modal-body" id="modal-body"></div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.querySelector("#modal-close-btn").addEventListener("click", close);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+    renderFn(overlay.querySelector("#modal-body"), close);
+  }
+
+  // -----------------------------------------------------------------
   // Bestellungen-Übersicht.
   // Kombiniert bestellungen_abteilung / _kunde / _hotel in einer Liste mit
   // Typ-Badge. Sichtbarkeit je Rolle folgt den Firestore Security Rules:
   // admin/leitung sehen alles, abteilung sieht eigene Abteilungs-/Kunden-
   // bestellungen + alle Hotelbestellungen, hotelrestaurant nur eigene.
-  // In dieser Schicht: nur ansehen + löschen (admin/leitung); Bearbeiten
-  // folgt später.
+  // Bearbeiten (alle Felder) über das gleiche Formular wie beim Erstellen,
+  // vorausgefüllt in einem Modal. Löschen weiterhin nur admin/leitung.
   // -----------------------------------------------------------------
   function initBestellungenUebersicht(container, { role, uid }) {
     container.innerHTML = "";
@@ -1330,10 +1451,46 @@
     let dataAbteilung = [];
     let dataKunde = [];
     let dataHotel = [];
-    const loaded = { abteilung: false, kunde: false, hotel: false };
+    let bestellschlussData = {};
+    const loaded = { abteilung: false, kunde: false, hotel: false, bestellschluss: false };
+
+    getDoc(doc(db, "einstellungen", "bestellschluss"))
+      .then((snap) => { bestellschlussData = snap.exists() ? snap.data() : {}; })
+      .catch((err) => console.error(err))
+      .finally(() => { loaded.bestellschluss = true; render(); });
+
+    function bestellschlussErreicht(typ) {
+      if (typeof bestellschlussData[typ] !== "number") return false;
+      const now = new Date();
+      return (now.getUTCHours() * 60 + now.getUTCMinutes()) >= bestellschlussData[typ];
+    }
+
+    function canEditOrder(o) {
+      if (role === "admin" || role === "leitung") return true;
+      if (o.__typ === "abteilung") return role === "abteilung" && o.erstelltVon === uid && !bestellschlussErreicht("abteilung");
+      if (o.__typ === "kunde") return role === "abteilung" && o.erstelltVon === uid && !bestellschlussErreicht("kunde");
+      if (o.__typ === "hotel") {
+        if (role === "abteilung") return !bestellschlussErreicht("hotel");
+        if (role === "hotelrestaurant") return o.hotelUid === uid && !bestellschlussErreicht("hotel");
+      }
+      return false;
+    }
+
+    function handleEdit(o) {
+      const formByTyp = {
+        abteilung: initAbteilungsbestellungForm,
+        kunde: initKundenbestellungForm,
+        hotel: initHotelbestellungForm,
+      };
+      const formFn = formByTyp[o.__typ];
+      if (!formFn) return;
+      openEditModal((body, close) => {
+        formFn(body, { role, uid, existing: o, onSaved: close });
+      });
+    }
 
     function render() {
-      if (!loaded.abteilung || !loaded.kunde || !loaded.hotel) return;
+      if (!loaded.abteilung || !loaded.kunde || !loaded.hotel || !loaded.bestellschluss) return;
 
       const all = [
         ...dataAbteilung.map((o) => ({ ...o, __typ: "abteilung", __coll: "bestellungen_abteilung" })),
@@ -1351,7 +1508,7 @@
       const canDelete = role === "admin" || role === "leitung";
 
       listEl.innerHTML = all
-        .map((o) => {
+        .map((o, idx) => {
           const typMeta = TYPE_META[o.__typ];
           const statusMeta = STATUS_META[o.status] || { label: o.status || "–", cls: "" };
           let titleLine;
@@ -1365,6 +1522,7 @@
           const itemsSummary = o.items && o.items.length
             ? o.items.map((it) => `${escapeHtml(it.artikelName)} × ${it.menge}`).join(", ")
             : "Keine Artikel";
+          const canEdit = canEditOrder(o);
 
           return `
             <div class="card" style="padding:14px 16px;margin-bottom:10px;">
@@ -1377,11 +1535,18 @@
                 <span class="status-tag ${statusMeta.cls}">${statusMeta.label}</span>
               </div>
               <div class="hint-text" style="margin-top:10px;">${itemsSummary}</div>
-              ${canDelete ? `<button type="button" class="btn btn-danger" data-action="delete" data-coll="${o.__coll}" data-id="${o.id}" style="margin-top:12px;padding:8px 14px;font-size:13px;">Löschen</button>` : ""}
+              <div style="display:flex;gap:8px;margin-top:12px;">
+                ${canEdit ? `<button type="button" class="btn btn-secondary" data-action="edit" data-idx="${idx}" style="padding:8px 14px;font-size:13px;">Bearbeiten</button>` : ""}
+                ${canDelete ? `<button type="button" class="btn btn-danger" data-action="delete" data-coll="${o.__coll}" data-id="${o.id}" style="padding:8px 14px;font-size:13px;">Löschen</button>` : ""}
+              </div>
             </div>
           `;
         })
         .join("");
+
+      listEl.querySelectorAll('[data-action="edit"]').forEach((btn) => {
+        btn.addEventListener("click", () => handleEdit(all[Number(btn.dataset.idx)]));
+      });
     }
 
     function watch(collName, filterField, matchesRole, key) {
