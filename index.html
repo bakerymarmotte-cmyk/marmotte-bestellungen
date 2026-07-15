@@ -4,15 +4,32 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Marmotte Bestellungen – Login</title>
-<meta name="theme-color" content="#1A1A1A">
+<meta name="theme-color" content="#383E42">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Marmotte">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" type="image/png" sizes="32x32" href="assets/icon_bestellungen_favicon32.png">
-<link rel="apple-touch-icon" href="assets/icon_bestellungen_appletouch180.png">
+
+<!-- Icons -->
+<link rel="icon" type="image/png" href="assets/icon192.png">
+<link rel="apple-touch-icon" sizes="120x120" href="assets/appletouchicon120.png">
+<link rel="apple-touch-icon" sizes="152x152" href="assets/appletouchicon152.png">
+<link rel="apple-touch-icon" sizes="167x167" href="assets/appletouchicon167.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/appletouchicon180.png">
+<meta name="msapplication-TileColor" content="#383E42">
+<meta name="msapplication-TileImage" content="assets/tile150.png">
+<meta name="msapplication-square150x150logo" content="assets/tile150.png">
+<meta name="msapplication-square310x310logo" content="assets/tile310.png">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+
+<!-- Zentrales Marmotte-Design-System.
+     Reihenfolge zwingend: tokens -> components -> lokale style.css.
+     Kein Cache-Buster noetig: der Service Worker holt diese beiden Dateien
+     network-first, Aenderungen im Design-Repo kommen sofort an. -->
+<link rel="stylesheet" href="https://bakerymarmotte-cmyk.github.io/marmotte-design/tokens.css">
+<link rel="stylesheet" href="https://bakerymarmotte-cmyk.github.io/marmotte-design/components.css">
 <link rel="stylesheet" href="style.css">
 <style>
   .login-wrap { width: 100%; max-width: 400px; }

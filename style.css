@@ -1,30 +1,11 @@
 /* ==========================================================================
-   Marmotte Zeiterfassung – Design-Tokens
+   Marmotte Bestellungen – App-spezifische Styles
+
+   Design-Tokens (Farben, Fonts, Radien, Schatten) kommen zentral aus
+   marmotte-design/tokens.css, die Topbar aus marmotte-design/components.css.
+   Beide muessen VOR dieser Datei eingebunden sein – hier stehen bewusst
+   keine Fallback-Tokens mehr.
    ========================================================================== */
-:root {
-  /* Farben – abgestimmt auf das Marmotte-Logo */
-  --color-bg: #1A1A1A;           /* Anthrazit, exakt wie Logo-Hintergrund */
-  --color-surface: #232323;
-  --color-surface-raised: #2A2A2A;
-  --color-border: #363636;
-  --color-yellow: #FDD600;       /* Gold, exakt wie das "M" im Logo */
-  --color-yellow-deep: #E0BC00;
-  --color-text: #F5F5F0;
-  --color-text-muted: #9E9E9E;
-  --color-success: #4CAF7D;
-  --color-danger: #E5484D;
-
-  /* Typografie */
-  --font-display: "Century Gothic", CenturyGothic, "Jost", sans-serif;
-  --font-body: "Century Gothic", CenturyGothic, "Jost", sans-serif;
-  --font-mono: "IBM Plex Mono", "Courier New", monospace;
-
-  /* Sonstiges */
-  --radius-sm: 8px;
-  --radius-md: 14px;
-  --radius-lg: 24px;
-  --shadow-card: 0 12px 32px rgba(0, 0, 0, 0.35);
-}
 
 * { box-sizing: border-box; }
 

@@ -4,81 +4,50 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Marmotte Bestellungen</title>
-<meta name="theme-color" content="#1A1A1A">
+<meta name="theme-color" content="#383E42">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Marmotte">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" type="image/png" sizes="32x32" href="assets/icon_bestellungen_favicon32.png">
-<link rel="apple-touch-icon" href="assets/icon_bestellungen_appletouch180.png">
+
+<!-- Icons -->
+<link rel="icon" type="image/png" href="assets/icon192.png">
+<link rel="apple-touch-icon" sizes="120x120" href="assets/appletouchicon120.png">
+<link rel="apple-touch-icon" sizes="152x152" href="assets/appletouchicon152.png">
+<link rel="apple-touch-icon" sizes="167x167" href="assets/appletouchicon167.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/appletouchicon180.png">
+<meta name="msapplication-TileColor" content="#383E42">
+<meta name="msapplication-TileImage" content="assets/tile150.png">
+<meta name="msapplication-square150x150logo" content="assets/tile150.png">
+<meta name="msapplication-square310x310logo" content="assets/tile310.png">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+
+<!-- Zentrales Marmotte-Design-System.
+     Reihenfolge zwingend: tokens -> components -> lokale style.css.
+     Kein Cache-Buster noetig: der Service Worker holt diese beiden Dateien
+     network-first, Aenderungen im Design-Repo kommen sofort an. -->
+<link rel="stylesheet" href="https://bakerymarmotte-cmyk.github.io/marmotte-design/tokens.css">
+<link rel="stylesheet" href="https://bakerymarmotte-cmyk.github.io/marmotte-design/components.css">
 <link rel="stylesheet" href="style.css">
 <style>
   html, body { height: 100%; }
   body { display: flex; flex-direction: column; }
 
-  /* ---------- Sticky Kopfbereich (Header + Tabbar) ---------- */
+  /* ---------- Sticky Kopfbereich (Topbar + Tabbar) ----------
+     Die .topbar-Optik kommt aus marmotte-design/components.css.
+     Hier nur der Rahmen, der sie (samt Tabbar) oben kleben laesst:
+     Hintergrund, damit Inhalt nicht durchscheint, plus Safe-Area fuers iPhone.
+     ---------------------------------------------------------- */
   .app-topbar {
     position: sticky;
     top: 0;
     z-index: 10;
-    background: var(--color-surface);
+    background: var(--color-bg);
     padding-top: env(safe-area-inset-top);
-  }
-
-  /* ---------- Header ---------- */
-  .app-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px 20px;
-    background: var(--color-surface);
     border-bottom: 1px solid var(--color-border);
   }
-  .app-header .brand {
-    font-family: var(--font-display);
-    font-weight: 800;
-    font-size: 19px;
-    color: var(--color-yellow);
-    letter-spacing: -0.01em;
-  }
-  .app-header .brand small {
-    display: block;
-    font-family: var(--font-body);
-    font-weight: 400;
-    font-size: 11px;
-    color: var(--color-text-muted);
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
-    margin-top: 1px;
-  }
-  .user-box {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .user-meta { text-align: right; }
-  .user-meta .name {
-    font-size: 13.5px;
-    font-weight: 600;
-    line-height: 1.2;
-  }
-  .user-meta .role {
-    font-size: 11.5px;
-    color: var(--color-text-muted);
-    text-transform: capitalize;
-  }
-  .logout-btn {
-    background: transparent;
-    border: 1px solid var(--color-border);
-    color: var(--color-text-muted);
-    border-radius: var(--radius-sm);
-    padding: 8px 12px;
-    font-size: 12.5px;
-    font-weight: 600;
-  }
-  .logout-btn:hover { color: var(--color-danger); border-color: rgba(229, 72, 77, 0.4); }
 
   /* ---------- Main content ---------- */
   main {
@@ -137,35 +106,42 @@
     border-color: var(--color-yellow);
   }
 
-  /* ---------- Tab-Leiste (jetzt oben, direkt unter Header) ---------- */
+  /* ---------- Tab-Leiste ----------
+     Bewusst lokal: components.css regelt nur die Topbar, die Tabs
+     unterscheiden sich je App. Optik an die Zeiterfassung angeglichen:
+     Icon oben, Label darunter, aktiver Tab gold + goldener Strich unten.
+     --------------------------------- */
   .tabbar {
     display: flex;
-    background: var(--color-surface);
-    border-bottom: 1px solid var(--color-border);
-    padding: 6px 6px;
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 0 6px;
   }
   .tab-btn {
     flex: 1;
     background: none;
     border: none;
+    border-bottom: 2px solid transparent;
     color: var(--color-text-muted);
     font-family: var(--font-body);
     font-size: 11.5px;
     font-weight: 600;
-    padding: 8px 4px 6px;
+    padding: 8px 4px 7px;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 4px;
-    border-radius: var(--radius-sm);
     text-align: center;
+    line-height: 1.2;
   }
-  .tab-btn .dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: transparent;
+  .tab-btn .tab-icon {
+    font-size: 16px;
+    line-height: 1;
   }
-  .tab-btn.active { color: var(--color-yellow); }
-  .tab-btn.active .dot { background: var(--color-yellow); }
+  .tab-btn.active {
+    color: var(--color-yellow);
+    border-bottom-color: var(--color-yellow);
+  }
 
   .loading-screen {
     display: flex;
@@ -326,15 +302,17 @@
 
 <div id="app-shell" style="display:none;">
   <div class="app-topbar">
-    <header class="app-header">
-      <div class="brand">Marmotte<small>Bestellungen</small></div>
-      <div class="user-box">
-        <div class="user-meta">
-          <div class="name" id="user-name">–</div>
-        </div>
+    <!-- Struktur exakt wie in marmotte-design/components.css dokumentiert -->
+    <div class="topbar">
+      <div class="brand">
+        <div class="brand-name">Marmotte</div>
+        <div class="brand-sub">Bestellungen</div>
+      </div>
+      <div class="who">
+        <span class="name" id="user-name-label"></span>
         <button type="button" class="logout-btn" id="logout-btn">Abmelden</button>
       </div>
-    </header>
+    </div>
 
     <nav class="tabbar" id="tabbar">
       <!-- Tabs werden per JS eingefügt, je nach Rolle -->
@@ -361,24 +339,24 @@
   // ---------------------------------------------------------------------
   const TABS_BY_ROLE = {
     admin: [
-      { id: "bestellungen", label: "Alle Bestellungen" },
-      { id: "erstellen", label: "Bestellung erstellen" },
-      { id: "einstellungen", label: "Einstellungen" },
+      { id: "bestellungen", label: "Alle Bestellungen", icon: "📋" },
+      { id: "erstellen", label: "Bestellung erstellen", icon: "➕" },
+      { id: "einstellungen", label: "Einstellungen", icon: "⚙️" },
     ],
     leitung: [
-      { id: "bestellungen", label: "Alle Bestellungen" },
-      { id: "erstellen", label: "Bestellung erstellen" },
-      { id: "einstellungen", label: "Einstellungen" },
+      { id: "bestellungen", label: "Alle Bestellungen", icon: "📋" },
+      { id: "erstellen", label: "Bestellung erstellen", icon: "➕" },
+      { id: "einstellungen", label: "Einstellungen", icon: "⚙️" },
     ],
     abteilung: [
-      { id: "bestellungen", label: "Meine Bestellungen" },
-      { id: "neu-abteilung", label: "Abteilung" },
-      { id: "neu-kunde", label: "Kunde" },
-      { id: "neu-hotel", label: "Hotel/Rest." },
+      { id: "bestellungen", label: "Meine Bestellungen", icon: "📋" },
+      { id: "neu-abteilung", label: "Abteilung", icon: "🏠" },
+      { id: "neu-kunde", label: "Kunde", icon: "👤" },
+      { id: "neu-hotel", label: "Hotel/Rest.", icon: "🏨" },
     ],
     hotelrestaurant: [
-      { id: "bestellungen", label: "Meine Bestellungen" },
-      { id: "neu", label: "Neue Bestellung" },
+      { id: "bestellungen", label: "Meine Bestellungen", icon: "📋" },
+      { id: "neu", label: "Neue Bestellung", icon: "➕" },
     ],
   };
 
@@ -1556,7 +1534,7 @@
       btn.type = "button";
       btn.className = "tab-btn" + (i === 0 ? " active" : "");
       btn.dataset.tab = tab.id;
-      btn.innerHTML = `<span class="dot"></span><span>${tab.label}</span>`;
+      btn.innerHTML = `<span class="tab-icon">${tab.icon || ""}</span><span>${tab.label}</span>`;
       btn.addEventListener("click", () => {
         bar.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
@@ -1571,7 +1549,7 @@
   function initApp(role, name, uid) {
     const tabs = TABS_BY_ROLE[role] || TABS_BY_ROLE.abteilung;
 
-    document.getElementById("user-name").textContent = name || "–";
+    document.getElementById("user-name-label").textContent = name || "";
 
     buildViews(tabs, role, uid);
     buildTabbar(tabs);
