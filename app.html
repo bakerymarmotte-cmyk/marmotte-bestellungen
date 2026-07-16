@@ -1718,22 +1718,27 @@
     function render() {
       if (!loaded.abteilung || !loaded.kunde || !loaded.hotel || !loaded.bestellschluss) return;
 
+      const morgen = tomorrowDateString();
+      const typOrder = { abteilung: 0, kunde: 1, hotel: 2 };
+
       const all = [
         ...dataAbteilung.map((o) => ({ ...o, __typ: "abteilung", __coll: "bestellungen_abteilung" })),
         ...dataKunde.map((o) => ({ ...o, __typ: "kunde", __coll: "bestellungen_kunde" })),
         ...dataHotel.map((o) => ({ ...o, __typ: "hotel", __coll: "bestellungen_hotel" })),
-      ];
+      ].filter((o) => o.liefertag === morgen);
+
+      const headerHtml = `<p class="hint-text" style="margin:-4px 0 14px;">Liefertag: morgen, ${formatDateDe(morgen)}</p>`;
 
       if (all.length === 0) {
-        listEl.innerHTML = `<div class="card placeholder-card"><p>Noch keine Bestellungen vorhanden.</p></div>`;
+        listEl.innerHTML = headerHtml + `<div class="card placeholder-card"><p>Keine Bestellungen für morgen vorhanden.</p></div>`;
         return;
       }
 
-      all.sort((a, b) => (a.liefertag || "").localeCompare(b.liefertag || ""));
+      all.sort((a, b) => (typOrder[a.__typ] - typOrder[b.__typ]));
 
       const canDelete = role === "admin" || role === "leitung";
 
-      listEl.innerHTML = all
+      listEl.innerHTML = headerHtml + all
         .map((o, idx) => {
           const typMeta = TYPE_META[o.__typ];
           const statusMeta = STATUS_META[o.status] || { label: o.status || "–", cls: "" };
@@ -1756,7 +1761,6 @@
                 <div style="min-width:0;">
                   <span class="type-badge ${typMeta.badgeClass}">${typMeta.label}</span>
                   <div style="font-weight:700;font-size:15px;margin-top:6px;">${titleLine}</div>
-                  <div class="hint-text" style="margin-top:2px;">Liefertag: ${o.liefertag ? formatDateDe(o.liefertag) : "–"}</div>
                 </div>
                 <span class="status-tag ${statusMeta.cls}">${statusMeta.label}</span>
               </div>
