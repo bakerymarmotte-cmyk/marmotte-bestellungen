@@ -424,6 +424,11 @@
   ];
 
   const EINSTELLUNGEN_SUBTABS = [
+    { id: "bestelleigenschaften", label: "Bestelleigenschaften" },
+    { id: "auswertung", label: "Auswertung" },
+  ];
+
+  const BESTELLEIGENSCHAFTEN_SUBTABS = [
     { id: "artikel-abteilung", label: "Artikel Abteilung/Kunde" },
     { id: "artikel-hotel", label: "Artikel Hotel/Restaurant" },
     { id: "bestellschluss", label: "Bestellschluss-Zeiten" },
@@ -1414,6 +1419,124 @@
   };
 
   // -----------------------------------------------------------------
+  // Einstellungen > Auswertung.
+  // Filtert Bestellungen nach Zeitraum (Liefertag von/bis) und Bestellart,
+  // rein lesend, kein Export in dieser Schicht.
+  // -----------------------------------------------------------------
+  function initAuswertungPanel(panel) {
+    const todayStr = todayDateString();
+    panel.innerHTML = `
+      <div class="mgmt-section">
+        <h3>Auswertung</h3>
+        <p class="hint-text" style="margin:-4px 0 16px;">Bestellungen nach Zeitraum und Bestellart filtern.</p>
+        <div class="inline-form" style="align-items:flex-end;">
+          <div class="field" style="margin:0;">
+            <label for="ausw-von">Von</label>
+            <input type="date" id="ausw-von" value="${todayStr}">
+          </div>
+          <div class="field" style="margin:0;">
+            <label for="ausw-bis">Bis</label>
+            <input type="date" id="ausw-bis" value="${todayStr}">
+          </div>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin:14px 0 16px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13.5px;">
+            <input type="checkbox" id="ausw-typ-abteilung" checked> Abteilung
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13.5px;">
+            <input type="checkbox" id="ausw-typ-kunde" checked> Kunde
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13.5px;">
+            <input type="checkbox" id="ausw-typ-hotel" checked> Hotel/Restaurant
+          </label>
+        </div>
+        <button type="button" class="btn btn-primary" id="ausw-suchen-btn" style="width:100%;">Anzeigen</button>
+        <div id="ausw-ergebnis" style="margin-top:18px;"></div>
+      </div>
+    `;
+
+    const ergebnisEl = panel.querySelector("#ausw-ergebnis");
+
+    panel.querySelector("#ausw-suchen-btn").addEventListener("click", async () => {
+      const von = panel.querySelector("#ausw-von").value;
+      const bis = panel.querySelector("#ausw-bis").value;
+      if (!von || !bis) {
+        ergebnisEl.innerHTML = `<p class="error-text">Bitte Von- und Bis-Datum angeben.</p>`;
+        return;
+      }
+      const wantAbteilung = panel.querySelector("#ausw-typ-abteilung").checked;
+      const wantKunde = panel.querySelector("#ausw-typ-kunde").checked;
+      const wantHotel = panel.querySelector("#ausw-typ-hotel").checked;
+
+      if (!wantAbteilung && !wantKunde && !wantHotel) {
+        ergebnisEl.innerHTML = `<p class="error-text">Bitte mindestens eine Bestellart auswählen.</p>`;
+        return;
+      }
+
+      ergebnisEl.innerHTML = `<div class="card placeholder-card"><p>Wird geladen …</p></div>`;
+
+      try {
+        const [abtSnap, kundeSnap, hotelSnap] = await Promise.all([
+          getDocs(collection(db, "bestellungen_abteilung")),
+          getDocs(collection(db, "bestellungen_kunde")),
+          getDocs(collection(db, "bestellungen_hotel")),
+        ]);
+
+        const inRange = (lt) => !!lt && lt >= von && lt <= bis;
+        const typOrder = { abteilung: 0, kunde: 1, hotel: 2 };
+
+        let all = [];
+        if (wantAbteilung) all = all.concat(abtSnap.docs.map((d) => ({ id: d.id, ...d.data(), __typ: "abteilung" })));
+        if (wantKunde) all = all.concat(kundeSnap.docs.map((d) => ({ id: d.id, ...d.data(), __typ: "kunde" })));
+        if (wantHotel) all = all.concat(hotelSnap.docs.map((d) => ({ id: d.id, ...d.data(), __typ: "hotel" })));
+
+        all = all.filter((o) => inRange(o.liefertag));
+        all.sort((a, b) => (a.liefertag || "").localeCompare(b.liefertag || "") || (typOrder[a.__typ] - typOrder[b.__typ]));
+
+        if (all.length === 0) {
+          ergebnisEl.innerHTML = `<div class="card placeholder-card"><p>Keine Bestellungen im gewählten Zeitraum.</p></div>`;
+          return;
+        }
+
+        ergebnisEl.innerHTML = `<p class="hint-text" style="margin:0 0 10px;">${all.length} Bestellung${all.length === 1 ? "" : "en"} gefunden.</p>` + all
+          .map((o) => {
+            const typMeta = TYPE_META[o.__typ];
+            const statusMeta = STATUS_META[o.status] || { label: o.status || "–", cls: "" };
+            let titleLine;
+            if (o.__typ === "abteilung") {
+              titleLine = o.abteilung === "dorfladen" ? "Dorfladen" : "Tearoom & Laden";
+            } else if (o.__typ === "kunde") {
+              titleLine = `${escapeHtml(o.kundenName || "–")} · ${o.liefermethode === "lieferung" ? "Lieferung" : "Abholung"}`;
+            } else {
+              titleLine = escapeHtml(o.hotelName || "–");
+            }
+            const itemsSummary = o.items && o.items.length
+              ? o.items.map((it) => `${escapeHtml(it.artikelName)} × ${it.menge}`).join(", ")
+              : "Keine Artikel";
+
+            return `
+              <div class="card" style="padding:14px 16px;margin-bottom:10px;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+                  <div style="min-width:0;">
+                    <span class="type-badge ${typMeta.badgeClass}">${typMeta.label}</span>
+                    <div style="font-weight:700;font-size:15px;margin-top:6px;">${titleLine}</div>
+                    <div class="hint-text" style="margin-top:2px;">Liefertag: ${o.liefertag ? formatDateDe(o.liefertag) : "–"}</div>
+                  </div>
+                  <span class="status-tag ${statusMeta.cls}">${statusMeta.label}</span>
+                </div>
+                <div class="hint-text" style="margin-top:10px;">${itemsSummary}</div>
+              </div>
+            `;
+          })
+          .join("");
+      } catch (err) {
+        console.error(err);
+        ergebnisEl.innerHTML = `<p class="error-text">Fehler beim Laden der Auswertung.</p>`;
+      }
+    });
+  }
+
+  // -----------------------------------------------------------------
   // Modal-Overlay für das Bearbeiten einer Bestellung. Öffnet das jeweilige
   // Formular (gleiche Funktion wie beim Erstellen) vorausgefüllt.
   // -----------------------------------------------------------------
@@ -1831,8 +1954,7 @@
     });
   }
 
-  function renderSubtabView(containerId, subtabs, contentPrefix, customRenderers = {}) {
-    const container = document.getElementById(containerId);
+  function renderSubtabView(container, subtabs, contentPrefix, customRenderers = {}) {
     const nav = document.createElement("div");
     nav.className = "subtabs";
     subtabs.forEach((st, i) => {
@@ -1881,17 +2003,22 @@
 
       if (tab.id === "erstellen") {
         main.appendChild(view);
-        renderSubtabView(`view-${tab.id}`, ERSTELLEN_SUBTABS, "erstellen", {
+        renderSubtabView(document.getElementById(`view-${tab.id}`), ERSTELLEN_SUBTABS, "erstellen", {
           "abteilung": (panel) => initAbteilungsbestellungForm(panel, { role, uid }),
           "kunde": (panel) => initKundenbestellungForm(panel, { role, uid }),
           "hotel": (panel) => initHotelbestellungForm(panel, { role, uid }),
         });
       } else if (tab.id === "einstellungen") {
         main.appendChild(view);
-        renderSubtabView(`view-${tab.id}`, EINSTELLUNGEN_SUBTABS, "einstellungen", {
-          "artikel-abteilung": initArtikelAbteilungPanel,
-          "artikel-hotel": initArtikelHotelPanel,
-          "bestellschluss": initBestellschlussPanel,
+        renderSubtabView(document.getElementById(`view-${tab.id}`), EINSTELLUNGEN_SUBTABS, "einstellungen", {
+          "bestelleigenschaften": (panel) => {
+            renderSubtabView(panel, BESTELLEIGENSCHAFTEN_SUBTABS, "bestelleigenschaften", {
+              "artikel-abteilung": initArtikelAbteilungPanel,
+              "artikel-hotel": initArtikelHotelPanel,
+              "bestellschluss": initBestellschlussPanel,
+            });
+          },
+          "auswertung": initAuswertungPanel,
         });
       } else if (tab.id === "bestellungen") {
         const body = document.createElement("div");
