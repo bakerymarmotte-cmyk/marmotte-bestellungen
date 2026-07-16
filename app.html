@@ -330,6 +330,9 @@
   }
   .modal-body { padding: 16px; }
 </style>
+
+<!-- jsPDF für Tagesdruck (PDF-Erzeugung im Browser) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 
@@ -1442,9 +1445,169 @@
   // Bearbeiten (alle Felder) über das gleiche Formular wie beim Erstellen,
   // vorausgefüllt in einem Modal. Löschen weiterhin nur admin/leitung.
   // -----------------------------------------------------------------
+  // -----------------------------------------------------------------
+  // Tagesdruck (PDF, jsPDF). Immer für "morgen":
+  // - Abteilungsbestellungen: Tearoom&Laden + Dorfladen zusammen auf 1 A4
+  //   (zuerst Tearoom&Laden, dann Dorfladen).
+  // - Kundenbestellungen: 1 A4 pro 12 Bestellungen, Raster 3 Spalten x 4
+  //   Zeilen, je eine Box pro Bestellung (Name, Liefertag, Artikel).
+  // - Hotel/Restaurant: je 1 eigenes A4 pro Bestellung.
+  // -----------------------------------------------------------------
+  function drawAbteilungsSeite(pdf, orders, liefertag) {
+    const pageW = 210, margin = 15;
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(16);
+    pdf.text("Abteilungsbestellungen", margin, 20);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(11);
+    pdf.text(`Lieferung: ${formatDateDe(liefertag)}`, margin, 27);
+
+    const reihenfolge = ["tearoom_laden", "dorfladen"];
+    const sortiert = reihenfolge.map((t) => orders.find((o) => o.abteilung === t)).filter(Boolean);
+
+    const startY = 36;
+    const sectionHeight = (297 - startY - margin) / 2;
+    let y = startY;
+    sortiert.forEach((o) => {
+      const label = o.abteilung === "dorfladen" ? "Dorfladen" : "Tearoom & Laden";
+      pdf.setDrawColor(180);
+      pdf.rect(margin, y, pageW - margin * 2, sectionHeight - 6);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(13);
+      pdf.text(label, margin + 4, y + 9);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(11);
+      let itemY = y + 18;
+      (o.items || []).forEach((it) => {
+        pdf.text(`${it.artikelName}`, margin + 6, itemY);
+        pdf.text(`× ${it.menge}`, pageW - margin - 20, itemY);
+        itemY += 6.5;
+      });
+      if (!o.items || o.items.length === 0) {
+        pdf.setTextColor(150);
+        pdf.text("Keine Artikel", margin + 6, itemY);
+        pdf.setTextColor(0);
+      }
+      y += sectionHeight;
+    });
+  }
+
+  function drawKundenSeite(pdf, orders) {
+    const pageW = 210, pageH = 297, margin = 10, cols = 3, rows = 4, gap = 4;
+    const boxW = (pageW - margin * 2 - gap * (cols - 1)) / cols;
+    const boxH = (pageH - margin * 2 - gap * (rows - 1)) / rows;
+
+    orders.forEach((o, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const x = margin + col * (boxW + gap);
+      const y = margin + row * (boxH + gap);
+
+      pdf.setDrawColor(180);
+      pdf.rect(x, y, boxW, boxH);
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(11);
+      pdf.text(o.kundenName || "–", x + 3, y + 6, { maxWidth: boxW - 6 });
+
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(8.5);
+      pdf.text(
+        `${formatDateDe(o.liefertag)} · ${o.liefermethode === "lieferung" ? "Lieferung" : "Abholung"}`,
+        x + 3, y + 12
+      );
+
+      pdf.setFontSize(9);
+      let itemY = y + 18;
+      (o.items || []).forEach((it) => {
+        const zeile = `${it.artikelName} × ${it.menge}`;
+        const wrapped = pdf.splitTextToSize(zeile, boxW - 6);
+        wrapped.forEach((wl) => {
+          if (itemY <= y + boxH - 3) {
+            pdf.text(wl, x + 3, itemY);
+            itemY += 4.2;
+          }
+        });
+      });
+    });
+  }
+
+  function drawHotelSeite(pdf, o) {
+    const pageW = 210, margin = 15;
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(18);
+    pdf.text(o.hotelName || "–", margin, 22);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(12);
+    pdf.text(`Lieferung: ${formatDateDe(o.liefertag)}`, margin, 30);
+    pdf.setDrawColor(200);
+    pdf.line(margin, 35, pageW - margin, 35);
+
+    let y = 46;
+    pdf.setFontSize(12);
+    (o.items || []).forEach((it) => {
+      pdf.text(`${it.artikelName}`, margin, y);
+      pdf.text(`× ${it.menge}`, pageW - margin - 22, y);
+      y += 8;
+    });
+    if (!o.items || o.items.length === 0) {
+      pdf.setTextColor(150);
+      pdf.text("Keine Artikel", margin, y);
+      pdf.setTextColor(0);
+    }
+  }
+
+  function erstelleTagesdruck(abtOrders, kundeOrders, hotelOrders, liefertag) {
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+      alert("PDF-Bibliothek konnte nicht geladen werden. Bitte Internetverbindung prüfen.");
+      return;
+    }
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: "mm", format: "a4" });
+    let pageUsed = false;
+    const ensurePage = () => {
+      if (pageUsed) pdf.addPage();
+      pageUsed = true;
+    };
+
+    if (abtOrders.length > 0) {
+      ensurePage();
+      drawAbteilungsSeite(pdf, abtOrders, liefertag);
+    }
+    for (let i = 0; i < kundeOrders.length; i += 12) {
+      ensurePage();
+      drawKundenSeite(pdf, kundeOrders.slice(i, i + 12));
+    }
+    hotelOrders.forEach((o) => {
+      ensurePage();
+      drawHotelSeite(pdf, o);
+    });
+
+    pdf.save(`Tagesdruck_${liefertag}.pdf`);
+  }
+
   function initBestellungenUebersicht(container, { role, uid }) {
     container.innerHTML = "";
     const listEl = document.createElement("div");
+
+    if (role === "admin" || role === "leitung") {
+      const toolbar = document.createElement("div");
+      toolbar.style.marginBottom = "14px";
+      toolbar.innerHTML = `<button type="button" class="btn btn-secondary" id="tagesdruck-btn">🖨️ Tagesdruck für morgen</button>`;
+      container.appendChild(toolbar);
+      toolbar.querySelector("#tagesdruck-btn").addEventListener("click", () => {
+        const morgen = tomorrowDateString();
+        const abtOrders = dataAbteilung.filter((o) => o.liefertag === morgen);
+        const kundeOrders = dataKunde.filter((o) => o.liefertag === morgen);
+        const hotelOrders = dataHotel.filter((o) => o.liefertag === morgen);
+        if (abtOrders.length === 0 && kundeOrders.length === 0 && hotelOrders.length === 0) {
+          alert(`Keine Bestellungen für morgen (${formatDateDe(morgen)}) vorhanden.`);
+          return;
+        }
+        erstelleTagesdruck(abtOrders, kundeOrders, hotelOrders, morgen);
+      });
+    }
+
     container.appendChild(listEl);
     listEl.innerHTML = `<div class="card placeholder-card"><p>Bestellungen werden geladen …</p></div>`;
 
