@@ -1,10 +1,7 @@
 /* ==========================================================================
-   Marmotte Bestellungen – App-spezifische Styles
-
-   Design-Tokens (Farben, Fonts, Radien, Schatten) kommen zentral aus
-   marmotte-design/tokens.css, die Topbar aus marmotte-design/components.css.
-   Beide muessen VOR dieser Datei eingebunden sein – hier stehen bewusst
-   keine Fallback-Tokens mehr.
+   Marmotte Bestellungen – App-spezifisches Styling
+   Farben, Schrift und Hell/Dunkel kommen aus marmotte-design/marmotte.css
+   (muss vor dieser Datei eingebunden sein).
    ========================================================================== */
 
 * { box-sizing: border-box; }
@@ -12,41 +9,35 @@
 html, body {
   margin: 0;
   padding: 0;
-  background: var(--color-bg);
-  color: var(--color-text);
-  font-family: var(--font-body);
+  background: var(--m-bg);
+  color: var(--m-text);
+  font-family: var(--m-font);
   min-height: 100vh;
 }
 
-body {
-  background-image:
-    radial-gradient(circle at 85% -10%, rgba(244, 193, 15, 0.10), transparent 45%),
-    radial-gradient(circle at -10% 110%, rgba(244, 193, 15, 0.06), transparent 40%);
-}
-
-a { color: var(--color-yellow); }
+a { color: var(--m-accent-text); }
 
 button {
-  font-family: var(--font-body);
+  font-family: inherit;
   cursor: pointer;
 }
 
 select {
-  background: var(--color-surface-raised);
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
+  background: var(--m-surface-2);
+  color: var(--m-text);
+  border: 1px solid var(--m-border);
+  border-radius: var(--m-radius-sm);
   padding: 4px 8px;
-  font-family: var(--font-body);
+  font-family: inherit;
   font-size: 13.5px;
 }
 
-::selection { background: var(--color-yellow); color: #121212; }
+::selection { background: var(--m-chip-bg); color: var(--m-chip-fg); }
 
 /* Scrollbar dezent */
 ::-webkit-scrollbar { width: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 8px; }
+::-webkit-scrollbar-thumb { background: var(--m-border); border-radius: 8px; }
 
 /* ==========================================================================
    Layout-Helfer
@@ -54,36 +45,17 @@ select {
 .centered-screen {
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 16px;
 }
 
 .card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
-}
-
-/* ==========================================================================
-   Stoppuhr-Signaturelement
-   ========================================================================== */
-.stopwatch-ring {
-  position: relative;
-  width: 64px;
-  height: 64px;
-}
-.stopwatch-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-.stopwatch-ring circle {
-  fill: none;
-  stroke-width: 4;
-}
-.stopwatch-ring .track { stroke: var(--color-border); }
-.stopwatch-ring .progress {
-  stroke: var(--color-yellow);
-  stroke-linecap: round;
-  transition: stroke-dashoffset 1s linear;
+  background: var(--m-card);
+  border: 1px solid var(--m-border);
+  border-radius: var(--m-radius-lg);
+  box-shadow: var(--m-shadow);
 }
 
 /* ==========================================================================
@@ -92,30 +64,31 @@ select {
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 18px;
+  gap: 4px;
+  margin-bottom: 14px;
   text-align: left;
 }
 .field label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text-muted);
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--m-muted);
 }
-.field input, .field select {
-  background: var(--color-surface-raised);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: 12px 14px;
-  color: var(--color-text);
-  font-size: 15px;
-  font-family: var(--font-body);
+.field input, .field select, .field textarea {
+  background: var(--m-surface-2);
+  border: 1px solid var(--m-border);
+  border-radius: var(--m-radius-sm);
+  padding: 11px 12px;
+  color: var(--m-text);
+  font-size: 16px;          /* 16px verhindert das Hineinzoomen auf dem iPhone */
+  font-family: inherit;
   outline: none;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  width: 100%;
+  min-width: 0;
 }
-.field input:focus, .field select:focus {
-  border-color: var(--color-yellow);
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--m-accent);
+  box-shadow: 0 0 0 3px var(--m-chip-bg);
 }
 
 .btn {
@@ -123,45 +96,139 @@ select {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: none;
-  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  border-radius: var(--m-radius-md);
   padding: 13px 20px;
-  font-weight: 700;
-  font-size: 15px;
-  transition: transform 0.1s ease, filter 0.15s ease;
+  font-weight: 600;
+  font-size: 14px;
+  transition: transform 0.1s ease, filter 0.15s ease, border-color 0.15s ease;
 }
 .btn:active { transform: scale(0.98); }
 .btn-primary {
-  background: var(--color-yellow);
-  color: #1a1400;
+  background: var(--m-accent);
+  color: var(--m-accent-fg);
 }
-.btn-primary:hover { filter: brightness(1.08); }
+.btn-primary:hover { filter: brightness(1.1); }
 .btn-primary:disabled {
-  background: var(--color-border);
-  color: var(--color-text-muted);
+  background: var(--m-card-soft);
+  color: var(--m-faint);
+  border-color: var(--m-border);
   cursor: not-allowed;
 }
 .btn-secondary {
-  background: transparent;
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
+  background: var(--m-card);
+  color: var(--m-text);
+  border-color: var(--m-border);
 }
-.btn-secondary:hover { border-color: var(--color-yellow); }
+.btn-secondary:hover { border-color: var(--m-accent); }
 .btn-danger {
   background: transparent;
-  color: var(--color-danger);
-  border: 1px solid rgba(229, 72, 77, 0.4);
+  color: var(--m-danger);
+  border-color: var(--m-danger);
 }
 
 .error-text {
-  color: var(--color-danger);
+  color: var(--m-danger);
   font-size: 13.5px;
-  margin-top: -8px;
-  margin-bottom: 14px;
-  min-height: 18px;
+  margin: 0 0 12px;
 }
+.error-text:empty { margin: 0; }
+form .btn { margin-top: 6px; }
 
 .hint-text {
-  color: var(--color-text-muted);
+  color: var(--m-muted);
   font-size: 13px;
 }
+
+/* ==========================================================================
+   Login- und Passwort-Seite: Logo-Block und Umschalter
+   ========================================================================== */
+.theme-row { width: 100%; display: flex; justify-content: flex-end; margin-bottom: 12px; }
+.brand-col { display: flex; flex-direction: column; align-items: center; margin-bottom: 28px; }
+.brand-col .brand-logo {
+  width: 64px; height: 64px; border-radius: var(--m-radius-lg);
+  background: var(--m-accent); color: #fef3c7;
+  display: flex; align-items: center; justify-content: center; margin-bottom: 12px;
+}
+.brand-col .brand-title { font-size: 24px; font-weight: 700; color: var(--m-accent); letter-spacing: -0.01em; line-height: 1.2; }
+.brand-col .brand-sub { font-size: 14px; color: var(--m-muted); margin-top: 2px; }
+
+
+/* ==========================================================================
+   App-Rahmen: Inhalt, Navigation, Tabs
+   ========================================================================== */
+main { max-width: 640px; margin: 0 auto; padding: 12px 16px 60px; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+.admin-only { display: none !important; }
+body.is-admin .admin-only { display: flex !important; }
+
+.nav-wrap { position: sticky; top: 0; z-index: 50; background: var(--m-bg); padding: 4px 16px 8px; }
+.main-nav {
+  display: flex; gap: 4px; max-width: 640px; margin: 0 auto; padding: 4px;
+  background: var(--m-card); border: 1px solid var(--m-border);
+  border-radius: var(--m-radius-lg); box-shadow: var(--m-shadow);
+}
+.main-nav button {
+  flex: 1; min-width: 0; background: none; border: none; color: var(--m-muted);
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 8px 2px 7px; border-radius: var(--m-radius-md); font-size: 11px; font-weight: 500;
+}
+.main-nav button .icon { display: flex; }
+.main-nav button.active { background: var(--m-chip-bg); color: var(--m-chip-fg); }
+
+.m-section-title { margin: 8px 4px 12px; }
+h3.section-title { font-size: 16px; font-weight: 600; margin: 0 0 14px; }
+.mono { font-family: var(--m-font-mono); font-variant-numeric: tabular-nums; }
+.form-card { padding: 16px; margin-bottom: 18px; }
+.form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.btn-row { display: flex; gap: 10px; }
+.btn-row .btn { flex: 1; }
+.btn-small { padding: 7px 12px; font-size: 12.5px; border-radius: var(--m-radius-sm); }
+.txt-plus { color: var(--m-success); }
+.txt-minus { color: var(--m-danger); }
+
+
+/* ==========================================================================
+   Brücke zu den alten Design-Variablen
+   Die App-Logik (Vorlagen im JavaScript) verwendet noch die Namen aus dem
+   früheren Design (--color-…). Sie zeigen hier auf die neuen Farben, damit
+   Hell/Dunkel überall stimmt.
+   ========================================================================== */
+:root {
+  --color-bg: var(--m-bg);
+  --color-surface: var(--m-card);
+  --color-surface-raised: var(--m-surface-2);
+  --color-border: var(--m-border);
+  --color-yellow: var(--m-accent);
+  --color-yellow-deep: var(--m-accent-strong);
+  --color-text: var(--m-text);
+  --color-text-muted: var(--m-muted);
+  --color-success: var(--m-success);
+  --color-danger: var(--m-danger);
+  --font-display: var(--m-font);
+  --font-body: var(--m-font);
+  --font-mono: var(--m-font-mono);
+  --radius-sm: var(--m-radius-sm);
+  --radius-md: var(--m-radius-md);
+  --radius-lg: var(--m-radius-lg);
+  --shadow-card: var(--m-shadow);
+}
+
+.field textarea { resize: vertical; line-height: 1.45; }
+.btn-small { padding: 7px 12px; font-size: 12.5px; border-radius: var(--m-radius-sm); }
+.success-text { color: var(--m-success); font-size: 13.5px; margin: 10px 0 0; }
+.success-text:empty { display: none; }
+.nav-wrap { position: sticky; top: 0; z-index: 50; background: var(--m-bg); padding: 4px 16px 8px; }
+.main-nav {
+  display: flex; gap: 4px; max-width: 640px; margin: 0 auto; padding: 4px;
+  background: var(--m-card); border: 1px solid var(--m-border);
+  border-radius: var(--m-radius-lg); box-shadow: var(--m-shadow);
+}
+.main-nav button {
+  flex: 1; min-width: 0; background: none; border: none; color: var(--m-muted);
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 8px 2px 7px; border-radius: var(--m-radius-md); font-size: 11px; font-weight: 500; text-align: center; line-height: 1.2;
+}
+.main-nav button .icon { display: flex; }
+.main-nav button.active { background: var(--m-chip-bg); color: var(--m-chip-fg); }

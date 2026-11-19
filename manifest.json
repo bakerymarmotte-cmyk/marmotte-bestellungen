@@ -1,12 +1,12 @@
 {
   "name": "Marmotte Bestellungen",
-  "short_name": "Marmotte Orders",
+  "short_name": "Bestellungen",
   "description": "Marmotte Bestellungen – Verwaltung und Erfassung von Bestellungen",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#383E42",
-  "theme_color": "#383E42",
+  "background_color": "#f5f4f2",
+  "theme_color": "#f5f4f2",
   "orientation": "portrait-primary",
   "icons": [
     {

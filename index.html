@@ -4,113 +4,48 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Marmotte Bestellungen – Login</title>
-<meta name="theme-color" content="#383E42">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Marmotte">
-<link rel="manifest" href="manifest.json">
-
-<!-- Icons -->
 <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
 <link rel="apple-touch-icon" sizes="120x120" href="assets/apple-touch-icon-120.png">
 <link rel="apple-touch-icon" sizes="152x152" href="assets/apple-touch-icon-152.png">
 <link rel="apple-touch-icon" sizes="167x167" href="assets/apple-touch-icon-167.png">
 <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon-180.png">
-<meta name="msapplication-TileColor" content="#383E42">
-<meta name="msapplication-TileImage" content="assets/tile-150.png">
-<meta name="msapplication-square150x150logo" content="assets/tile-150.png">
-<meta name="msapplication-square310x310logo" content="assets/tile-310.png">
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
-
-<!-- Zentrales Marmotte-Design-System.
-     Reihenfolge zwingend: tokens -> components -> lokale style.css.
-     Kein Cache-Buster noetig: der Service Worker holt diese beiden Dateien
-     network-first, Aenderungen im Design-Repo kommen sofort an. -->
-<link rel="stylesheet" href="https://bakerymarmotte-cmyk.github.io/marmotte-design/tokens.css">
-<link rel="stylesheet" href="https://bakerymarmotte-cmyk.github.io/marmotte-design/components.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#f5f4f2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Marmotte">
+<link rel="stylesheet" href="https://bakerymarmotte-cmyk.github.io/marmotte-design/marmotte.css">
 <link rel="stylesheet" href="style.css">
+<script src="https://bakerymarmotte-cmyk.github.io/marmotte-design/theme.js"></script>
+<script src="https://bakerymarmotte-cmyk.github.io/marmotte-design/icons.js" defer></script>
 <style>
-  .login-wrap { width: 100%; max-width: 400px; }
-  .brand-row {
-    text-align: center; margin-bottom: 36px;
-  }
-  .brand-title {
-    font-family: var(--font-display);
-    font-weight: 800;
-    font-size: 36px;
-    color: var(--color-yellow);
-    letter-spacing: -0.01em;
-    line-height: 1.1;
-  }
-  .brand-sub {
-    font-size: 22px;
-    font-family: var(--font-body);
-    font-weight: 400;
-    color: var(--color-yellow);
-    letter-spacing: -0.01em;
-    margin-top: 4px;
-    opacity: 0.9;
-  }
-  .login-card { padding: 36px 32px 32px; text-align: center; }
-  .login-card h1 {
-    font-size: 22px;
-    margin: 0 0 6px;
-    font-weight: 700;
-  }
-  .login-card .sub {
-    color: var(--color-text-muted);
-    font-size: 14px;
-    margin: 0 0 28px;
-  }
+  .login-wrap { width: 100%; max-width: 384px; }
+  .login-card { padding: 24px 20px 20px; text-align: center; }
+  .login-card h1 { font-size: 18px; margin: 0 0 4px; font-weight: 600; }
+  .login-card .sub { color: var(--m-muted); font-size: 14px; margin: 0 0 20px; }
   form { text-align: left; }
-  .footer-note {
-    text-align: center;
-    color: var(--color-text-muted);
-    font-size: 12.5px;
-    margin-top: 22px;
-  }
   .forgot-link {
-    display: block;
-    text-align: center;
-    margin-top: 16px;
-    font-size: 13.5px;
-    color: var(--color-text-muted);
-    background: none;
-    border: none;
-    cursor: pointer;
-    text-decoration: underline;
-    padding: 4px;
-    width: 100%;
+    display: block; width: 100%; margin-top: 12px; padding: 6px;
+    text-align: center; font: inherit; font-size: 13.5px; color: var(--m-muted);
+    background: none; border: none; cursor: pointer; text-decoration: underline;
   }
-  .forgot-link:hover { color: var(--color-yellow); }
-  #forgot-panel {
-    display: none;
-    text-align: left;
-    margin-top: 18px;
-    padding-top: 18px;
-    border-top: 1px solid var(--color-border);
-  }
+  .forgot-link:hover { color: var(--m-accent-text); }
+  #forgot-panel { display: none; text-align: left; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--m-border); }
   #forgot-panel.open { display: block; }
-  #forgot-panel p.sub {
-    color: var(--color-text-muted);
-    font-size: 13px;
-    margin: 0 0 14px;
-  }
-  .success-text {
-    color: var(--color-success);
-    font-size: 13.5px;
-    margin: 10px 0 0;
-  }
+  #forgot-panel p.sub { color: var(--m-muted); font-size: 13px; margin: 0 0 14px; }
+  .success-text { color: var(--m-success); font-size: 13.5px; margin: 0 0 12px; }
+  .success-text:empty { display: none; }
+  .footer-note { display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--m-faint); font-size: 12px; margin-top: 16px; }
 </style>
 </head>
 <body>
 
 <div class="centered-screen">
   <div class="login-wrap">
-    <div class="brand-row">
+    <div class="theme-row"><button class="m-theme-btn" data-theme-toggle aria-label="Hell/Dunkel umschalten"></button></div>
+    <div class="brand-col">
+      <div class="brand-logo"><i data-icon="croissant" data-size="30"></i></div>
       <div class="brand-title">Marmotte</div>
       <div class="brand-sub">Bestellungen</div>
     </div>
@@ -226,8 +161,11 @@
     }
   });
 
-  // Falls schon eingeloggt: kein Auto-Redirect, damit man sich bewusst neu einloggen kann.
-  onAuthStateChanged(auth, (user) => {});
+  // Falls schon eingeloggt: direkt weiterleiten (optional, hier nur Info-Konsole)
+  onAuthStateChanged(auth, (user) => {
+    // Bewusst kein Auto-Redirect hier, damit man sich auf dieser Testseite
+    // auch bewusst neu einloggen kann.
+  });
 
   // Passwort vergessen: Panel ein-/ausblenden
   const forgotToggle = document.getElementById("forgot-toggle");
@@ -264,6 +202,8 @@
       forgotForm.reset();
     } catch (err) {
       console.error(err);
+      // Aus Sicherheitsgründen keine Info preisgeben, ob die E-Mail existiert oder nicht,
+      // ausser bei offensichtlich ungültigem Format oder Rate-Limit.
       if (err.code === "auth/invalid-email" || err.code === "auth/too-many-requests") {
         forgotError.textContent = forgotMessages[err.code];
       } else {
@@ -275,8 +215,7 @@
     }
   });
 
-  // Service Worker registrieren, damit die App installierbar ist
-  // und offline funktioniert.
+  // Service Worker registrieren, damit die App auf dem Smartphone installierbar wird
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
       navigator.serviceWorker.register("./sw.js").catch((err) => {
@@ -284,7 +223,6 @@
       });
     });
   }
-
 </script>
 
 </body>

@@ -2,331 +2,99 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Marmotte Bestellungen</title>
-<meta name="theme-color" content="#383E42">
+<meta name="theme-color" content="#f5f4f2">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Marmotte">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Bestellungen">
 <link rel="manifest" href="manifest.json">
-
-<!-- Icons -->
 <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
 <link rel="apple-touch-icon" sizes="120x120" href="assets/apple-touch-icon-120.png">
 <link rel="apple-touch-icon" sizes="152x152" href="assets/apple-touch-icon-152.png">
 <link rel="apple-touch-icon" sizes="167x167" href="assets/apple-touch-icon-167.png">
 <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon-180.png">
-<meta name="msapplication-TileColor" content="#383E42">
-<meta name="msapplication-TileImage" content="assets/tile-150.png">
-<meta name="msapplication-square150x150logo" content="assets/tile-150.png">
-<meta name="msapplication-square310x310logo" content="assets/tile-310.png">
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
-
-<!-- Zentrales Marmotte-Design-System.
-     Reihenfolge zwingend: tokens -> components -> lokale style.css.
-     Kein Cache-Buster noetig: der Service Worker holt diese beiden Dateien
-     network-first, Aenderungen im Design-Repo kommen sofort an. -->
-<link rel="stylesheet" href="https://bakerymarmotte-cmyk.github.io/marmotte-design/tokens.css">
-<link rel="stylesheet" href="https://bakerymarmotte-cmyk.github.io/marmotte-design/components.css">
+<link rel="stylesheet" href="https://bakerymarmotte-cmyk.github.io/marmotte-design/marmotte.css">
 <link rel="stylesheet" href="style.css">
+<script src="https://bakerymarmotte-cmyk.github.io/marmotte-design/theme.js"></script>
+<script src="https://bakerymarmotte-cmyk.github.io/marmotte-design/icons.js" defer></script>
 <style>
-  html, body { height: 100%; }
-  body { display: flex; flex-direction: column; }
-
-  /* ---------- Sticky Kopfbereich (Topbar + Tabbar) ----------
-     Die .topbar-Optik kommt aus marmotte-design/components.css.
-     Hier nur der Rahmen, der sie (samt Tabbar) oben kleben laesst:
-     Hintergrund, damit Inhalt nicht durchscheint, plus Safe-Area fuers iPhone.
-     ---------------------------------------------------------- */
-  .app-topbar {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background: var(--color-bg);
-    padding-top: env(safe-area-inset-top);
-    border-bottom: 1px solid var(--color-border);
-  }
-
-  /* ---------- Main content ---------- */
-  main {
-    flex: 1;
-    padding: 20px 16px 32px;
-    max-width: 640px;
-    width: 100%;
-    margin: 0 auto;
-  }
+  /* App-spezifisch. Farben, Schrift und Hell/Dunkel aus marmotte.css (siehe style.css) */
+  main { max-width: 640px; width: 100%; margin: 0 auto; padding: 12px 16px 60px; }
   .view { display: none; }
   .view.active { display: block; }
-  .view-title {
-    font-size: 18px;
-    font-weight: 700;
-    margin: 4px 0 16px;
-  }
-  .placeholder-card {
-    padding: 28px 22px;
-    text-align: center;
-    color: var(--color-text-muted);
-    font-size: 14px;
-  }
-  .placeholder-card .stage-tag {
-    display: inline-block;
-    background: var(--color-surface-raised);
-    color: var(--color-yellow);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    letter-spacing: 0.03em;
-    padding: 4px 10px;
-    border-radius: 20px;
-    margin-bottom: 12px;
-  }
+  .view-title { font-size: 17px; font-weight: 600; margin: 6px 4px 14px; }
+  .placeholder-card { padding: 28px 22px; text-align: center; color: var(--m-muted); font-size: 14px; }
+  .placeholder-card .stage-tag { display: inline-block; background: var(--m-chip-bg); color: var(--m-chip-fg); font-size: 11px; padding: 4px 10px; border-radius: 999px; margin-bottom: 12px; }
 
-  /* Sub-tabs (z.B. innerhalb "Bestellung erstellen") */
-  .subtabs {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 18px;
-    overflow-x: auto;
-  }
+  /* Unter-Tabs */
+  .subtabs { display: flex; gap: 6px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 2px; }
   .subtab-btn {
-    flex: none;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    color: var(--color-text-muted);
-    border-radius: 20px;
-    padding: 9px 16px;
-    font-size: 13px;
-    font-weight: 600;
-    white-space: nowrap;
+    flex: none; background: var(--m-card); border: 1px solid var(--m-border); color: var(--m-muted);
+    border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 500; white-space: nowrap;
   }
-  .subtab-btn.active {
-    background: var(--color-yellow);
-    color: #1a1400;
-    border-color: var(--color-yellow);
-  }
+  .subtab-btn:hover { border-color: var(--m-accent); }
+  .subtab-btn.active { background: var(--m-chip-bg); color: var(--m-chip-fg); border-color: transparent; font-weight: 600; }
 
-  /* ---------- Tab-Leiste ----------
-     Bewusst lokal: components.css regelt nur die Topbar, die Tabs
-     unterscheiden sich je App. Optik an die Zeiterfassung angeglichen:
-     Icon oben, Label darunter, aktiver Tab gold + goldener Strich unten.
-     --------------------------------- */
-  .tabbar {
-    display: flex;
-    max-width: 640px;
-    margin: 0 auto;
-    padding: 0 6px;
-  }
-  .tab-btn {
-    flex: 1;
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    color: var(--color-text-muted);
-    font-family: var(--font-body);
-    font-size: 11.5px;
-    font-weight: 600;
-    padding: 8px 4px 7px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    text-align: center;
-    line-height: 1.2;
-  }
-  .tab-btn .tab-icon {
-    font-size: 16px;
-    line-height: 1;
-  }
-  .tab-btn.active {
-    color: var(--color-yellow);
-    border-bottom-color: var(--color-yellow);
-  }
+  .loading-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; color: var(--m-muted); font-size: 14px; }
 
-  .loading-screen {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    color: var(--color-text-muted);
-    font-size: 14px;
-  }
-
-  /* ---------- Verwaltung (Gruppen/Artikel) ---------- */
-  .mgmt-section { margin-bottom: 28px; }
-  .mgmt-section h3 {
-    font-size: 12.5px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--color-text-muted);
-    margin: 0 0 12px;
-  }
-  .inline-form {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 14px;
-    flex-wrap: wrap;
-  }
+  /* Verwaltung (Gruppen/Artikel) */
+  .mgmt-section { margin-bottom: 26px; }
+  .mgmt-section h3 { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: .05em; color: var(--m-faint); margin: 0 4px 10px; }
+  .inline-form { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
   .inline-form input, .inline-form select {
-    flex: 1;
-    min-width: 140px;
-    background: var(--color-surface-raised);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    padding: 11px 12px;
-    color: var(--color-text);
-    font-size: 14px;
-    font-family: var(--font-body);
+    flex: 1; min-width: 140px; background: var(--m-surface-2); border: 1px solid var(--m-border); border-radius: var(--m-radius-sm);
+    padding: 11px 12px; color: var(--m-text); font-size: 16px; font-family: inherit;
   }
-  .inline-form input:focus, .inline-form select:focus { outline: none; border-color: var(--color-yellow); }
+  .inline-form input:focus, .inline-form select:focus { outline: none; border-color: var(--m-accent); box-shadow: 0 0 0 3px var(--m-chip-bg); }
   .inline-form .btn { flex: none; padding: 11px 16px; font-size: 13.5px; }
 
-  .list-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 12px 14px;
-    border-bottom: 1px solid var(--color-border);
-  }
+  .list-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 14px; border-bottom: 1px solid var(--m-border); }
   .list-row:last-child { border-bottom: none; }
-  .list-row .row-name {
-    flex: 1;
-    font-size: 14px;
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
+  .list-row .row-name { flex: 1; font-size: 14px; min-width: 0; overflow-wrap: anywhere; }
   .list-row .row-name input {
-    width: 100%;
-    background: var(--color-surface-raised);
-    border: 1px solid var(--color-yellow);
-    border-radius: 6px;
-    padding: 6px 8px;
-    color: var(--color-text);
-    font-size: 14px;
-    font-family: var(--font-body);
+    width: 100%; background: var(--m-surface-2); border: 1px solid var(--m-accent); border-radius: 6px;
+    padding: 6px 8px; color: var(--m-text); font-size: 16px; font-family: inherit;
   }
   .row-actions { display: flex; align-items: center; gap: 6px; flex: none; }
   .icon-btn {
-    background: transparent;
-    border: 1px solid var(--color-border);
-    color: var(--color-text-muted);
-    border-radius: 6px;
-    width: 30px;
-    height: 30px;
-    font-size: 13px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    background: var(--m-surface-2); border: 1px solid var(--m-border); color: var(--m-muted); border-radius: 8px;
+    width: 32px; height: 32px; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; padding: 0;
   }
-  .icon-btn:hover { border-color: var(--color-yellow); color: var(--color-yellow); }
-  .icon-btn.danger:hover { border-color: rgba(229, 72, 77, 0.5); color: var(--color-danger); }
-  .toggle-btn {
-    background: transparent;
-    border: 1px solid var(--color-border);
-    color: var(--color-text-muted);
-    border-radius: 20px;
-    padding: 6px 12px;
-    font-size: 12px;
-    font-weight: 700;
-  }
-  .toggle-btn.active {
-    background: rgba(76, 175, 125, 0.15);
-    border-color: var(--color-success);
-    color: var(--color-success);
-  }
-  .group-header {
-    font-size: 11.5px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--color-yellow);
-    padding: 12px 14px 6px;
-  }
-  .group-header:first-child { padding-top: 4px; }
+  .icon-btn:hover { border-color: var(--m-accent); color: var(--m-accent-text); }
+  .icon-btn.danger:hover { border-color: var(--m-danger); color: var(--m-danger); }
+  .toggle-btn { background: var(--m-card); border: 1px solid var(--m-border); color: var(--m-muted); border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 600; }
+  .toggle-btn.active { background: var(--m-success-bg); border-color: var(--m-success); color: var(--m-success); }
+  .group-header { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--m-t-rose-fg, var(--m-accent-text)); padding: 12px 14px 6px; }
+  .group-header:first-child { padding-top: 6px; }
 
   .menge-input {
-    width: 64px;
-    text-align: center;
-    background: var(--color-surface-raised);
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
-    padding: 8px 6px;
-    color: var(--color-text);
-    font-size: 14px;
-    font-family: var(--font-body);
-    flex: none;
+    width: 64px; text-align: center; background: var(--m-surface-2); border: 1px solid var(--m-border); border-radius: 6px;
+    padding: 8px 6px; color: var(--m-text); font-size: 16px; font-family: var(--m-font-mono); flex: none;
   }
-  .menge-input:focus { outline: none; border-color: var(--color-yellow); }
+  .field .menge-input, .list-row .menge-input { width: 72px; min-width: 72px; }
+  .menge-input:focus { outline: none; border-color: var(--m-accent); box-shadow: 0 0 0 3px var(--m-chip-bg); }
+  .static-value { padding: 11px 12px; background: var(--m-surface-2); border: 1px solid var(--m-border); border-radius: var(--m-radius-sm); font-size: 15px; }
 
-  .static-value {
-    padding: 12px 14px;
-    background: var(--color-surface-raised);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    font-size: 15px;
-  }
+  .type-badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: var(--m-card-soft); color: var(--m-muted); }
+  .type-badge.type-abteilung { background: var(--m-t-sky-bg); color: var(--m-t-sky-fg); }
+  .type-badge.type-kunde { background: var(--m-t-amber-bg); color: var(--m-t-amber-fg); }
+  .type-badge.type-hotel { background: var(--m-t-emerald-bg); color: var(--m-t-emerald-fg); }
 
-  .type-badge {
-    display: inline-block;
-    font-size: 10.5px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    padding: 3px 9px;
-    border-radius: 12px;
-    background: var(--color-surface-raised);
-    color: var(--color-text-muted);
-  }
-  .type-badge.type-abteilung { color: #8ecbff; }
-  .type-badge.type-kunde { color: #ffd27a; }
-  .type-badge.type-hotel { color: #b7f0c0; }
+  .status-tag { display: inline-block; flex: none; font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+  .status-tag.status-offen { background: var(--m-t-amber-bg); color: var(--m-t-amber-fg); }
+  .status-tag.status-in_verarbeitung { background: var(--m-success-bg); color: var(--m-success); }
 
-  .status-tag {
-    display: inline-block;
-    flex: none;
-    font-size: 11px;
-    font-weight: 700;
-    padding: 4px 11px;
-    border-radius: 14px;
-    white-space: nowrap;
-  }
-  .status-tag.status-offen { background: rgba(253, 214, 0, 0.12); color: var(--color-yellow); }
-  .status-tag.status-in_verarbeitung { background: rgba(76, 175, 125, 0.15); color: var(--color-success); }
-
-  /* ---------- Modal (Bestellung bearbeiten) ---------- */
-  .modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.6);
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    z-index: 50;
-  }
+  /* Modal (Bestellung bearbeiten) */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(12,10,9,0.5); display: flex; align-items: flex-end; justify-content: center; z-index: 100; }
   .modal-panel {
-    background: var(--color-bg);
-    width: 100%;
-    max-width: 640px;
-    max-height: 90vh;
-    overflow-y: auto;
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--m-card); width: 100%; max-width: 640px; max-height: 90vh; overflow-y: auto;
+    border: 1px solid var(--m-border); border-bottom: none; border-radius: 20px 20px 0 0; padding-bottom: env(safe-area-inset-bottom);
   }
+  @media (min-width: 700px) { .modal-overlay { align-items: center; } .modal-panel { border-radius: 20px; border-bottom: 1px solid var(--m-border); } }
   .modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--color-border);
-    position: sticky;
-    top: 0;
-    background: var(--color-bg);
-    font-weight: 700;
-    font-size: 15px;
-    z-index: 1;
+    display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--m-border);
+    position: sticky; top: 0; background: var(--m-card); font-weight: 600; font-size: 16px; z-index: 1;
   }
   .modal-body { padding: 16px; }
 </style>
@@ -339,20 +107,23 @@
 <div id="loading-screen" class="loading-screen">Wird geladen …</div>
 
 <div id="app-shell" style="display:none;">
-  <div class="app-topbar">
-    <!-- Struktur exakt wie in marmotte-design/components.css dokumentiert -->
-    <div class="topbar">
-      <div class="brand">
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><i data-icon="croissant"></i></div>
+      <div>
         <div class="brand-name">Marmotte</div>
         <div class="brand-sub">Bestellungen</div>
       </div>
-      <div class="who">
-        <span class="name" id="user-name-label"></span>
-        <button type="button" class="logout-btn" id="logout-btn">Abmelden</button>
-      </div>
     </div>
+    <div class="who">
+      <span class="name" id="user-name-label"></span>
+      <button class="m-theme-btn" data-theme-toggle aria-label="Hell/Dunkel umschalten"></button>
+      <button type="button" class="logout-btn" id="logout-btn" aria-label="Abmelden"><i data-icon="log-out" data-size="16"></i></button>
+    </div>
+  </div>
 
-    <nav class="tabbar" id="tabbar">
+  <div class="nav-wrap">
+    <nav class="main-nav" id="tabbar">
       <!-- Tabs werden per JS eingefügt, je nach Rolle -->
     </nav>
   </div>
@@ -377,24 +148,24 @@
   // ---------------------------------------------------------------------
   const TABS_BY_ROLE = {
     admin: [
-      { id: "bestellungen", label: "Alle Bestellungen", icon: "📋" },
-      { id: "erstellen", label: "Bestellung erstellen", icon: "➕" },
-      { id: "einstellungen", label: "Einstellungen", icon: "⚙️" },
+      { id: "bestellungen", label: "Alle Bestellungen", icon: "file-text" },
+      { id: "erstellen", label: "Bestellung erstellen", icon: "plus" },
+      { id: "einstellungen", label: "Einstellungen", icon: "settings" },
     ],
     leitung: [
-      { id: "bestellungen", label: "Alle Bestellungen", icon: "📋" },
-      { id: "erstellen", label: "Bestellung erstellen", icon: "➕" },
-      { id: "einstellungen", label: "Einstellungen", icon: "⚙️" },
+      { id: "bestellungen", label: "Alle Bestellungen", icon: "file-text" },
+      { id: "erstellen", label: "Bestellung erstellen", icon: "plus" },
+      { id: "einstellungen", label: "Einstellungen", icon: "settings" },
     ],
     abteilung: [
-      { id: "bestellungen", label: "Meine Bestellungen", icon: "📋" },
-      { id: "neu-abteilung", label: "Abteilung", icon: "🏠" },
-      { id: "neu-kunde", label: "Kunde", icon: "👤" },
-      { id: "neu-hotel", label: "Hotel/Rest.", icon: "🏨" },
+      { id: "bestellungen", label: "Meine Bestellungen", icon: "file-text" },
+      { id: "neu-abteilung", label: "Abteilung", icon: "package" },
+      { id: "neu-kunde", label: "Kunde", icon: "user" },
+      { id: "neu-hotel", label: "Hotel/Rest.", icon: "coffee" },
     ],
     hotelrestaurant: [
-      { id: "bestellungen", label: "Meine Bestellungen", icon: "📋" },
-      { id: "neu", label: "Neue Bestellung", icon: "➕" },
+      { id: "bestellungen", label: "Meine Bestellungen", icon: "file-text" },
+      { id: "neu", label: "Neue Bestellung", icon: "plus" },
     ],
   };
 
@@ -614,8 +385,8 @@
           <div class="list-row" data-id="${g.id}">
             <span class="row-name" data-role="display">${escapeHtml(g.name)}</span>
             <div class="row-actions">
-              <button type="button" class="icon-btn" data-action="edit" title="Umbenennen">✎</button>
-              <button type="button" class="icon-btn danger" data-action="delete" title="Löschen">🗑</button>
+              <button type="button" class="icon-btn" data-action="edit" title="Umbenennen" aria-label="Umbenennen"><i data-icon="pencil" data-size="15"></i></button>
+              <button type="button" class="icon-btn danger" data-action="delete" title="Löschen" aria-label="Löschen"><i data-icon="trash-2" data-size="15"></i></button>
             </div>
           </div>`
           )
@@ -651,8 +422,8 @@
               <span class="row-name" data-role="display">${escapeHtml(a.name)}</span>
               <div class="row-actions">
                 <button type="button" class="toggle-btn ${a.aktiv ? "active" : ""}" data-action="toggle">${a.aktiv ? "Aktiv" : "Inaktiv"}</button>
-                <button type="button" class="icon-btn" data-action="edit" title="Umbenennen">✎</button>
-                <button type="button" class="icon-btn danger" data-action="delete" title="Löschen">🗑</button>
+                <button type="button" class="icon-btn" data-action="edit" title="Umbenennen" aria-label="Umbenennen"><i data-icon="pencil" data-size="15"></i></button>
+                <button type="button" class="icon-btn danger" data-action="delete" title="Löschen" aria-label="Löschen"><i data-icon="trash-2" data-size="15"></i></button>
               </div>
             </div>`
             )
@@ -779,8 +550,8 @@
           <span class="row-name" data-role="display">${escapeHtml(a.name)}</span>
           <div class="row-actions">
             <button type="button" class="toggle-btn ${a.aktiv ? "active" : ""}" data-action="toggle">${a.aktiv ? "Aktiv" : "Inaktiv"}</button>
-            <button type="button" class="icon-btn" data-action="edit" title="Umbenennen">✎</button>
-            <button type="button" class="icon-btn danger" data-action="delete" title="Löschen">🗑</button>
+            <button type="button" class="icon-btn" data-action="edit" title="Umbenennen" aria-label="Umbenennen"><i data-icon="pencil" data-size="15"></i></button>
+            <button type="button" class="icon-btn danger" data-action="delete" title="Löschen" aria-label="Löschen"><i data-icon="trash-2" data-size="15"></i></button>
           </div>
         </div>`
         )
@@ -1547,7 +1318,7 @@
       <div class="modal-panel">
         <div class="modal-header">
           <span>Bestellung bearbeiten</span>
-          <button type="button" class="icon-btn" id="modal-close-btn">✕</button>
+          <button type="button" class="icon-btn" id="modal-close-btn" aria-label="Schliessen"><i data-icon="x" data-size="16"></i></button>
         </div>
         <div class="modal-body" id="modal-body"></div>
       </div>
@@ -1762,13 +1533,13 @@
       const toolbar = document.createElement("div");
       toolbar.style.marginBottom = "14px";
       toolbar.innerHTML = `
-        <button type="button" class="btn btn-secondary" id="tagesdruck-btn" style="margin-bottom:10px;">🖨️ Tagesdruck für morgen</button>
+        <button type="button" class="btn btn-secondary" id="tagesdruck-btn" style="margin-bottom:10px;"><i data-icon="printer" data-size="16"></i> Tagesdruck für morgen</button>
         <div class="card" style="padding:14px 16px;display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
           <div class="field" style="margin:0;flex:1;min-width:140px;">
             <label for="export-monat">Export Hotel/Restaurant</label>
             <input type="month" id="export-monat" value="${todayDateString().slice(0, 7)}">
           </div>
-          <button type="button" class="btn btn-secondary" id="export-btn">⬇️ CSV exportieren</button>
+          <button type="button" class="btn btn-secondary" id="export-btn"><i data-icon="download" data-size="16"></i> CSV exportieren</button>
         </div>
       `;
       container.appendChild(toolbar);
@@ -2055,11 +1826,11 @@
     tabs.forEach((tab, i) => {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "tab-btn" + (i === 0 ? " active" : "");
+      btn.className = i === 0 ? "active" : "";
       btn.dataset.tab = tab.id;
-      btn.innerHTML = `<span class="tab-icon">${tab.icon || ""}</span><span>${tab.label}</span>`;
+      btn.innerHTML = `<span class="icon"><i data-icon="${tab.icon || "file-text"}"></i></span><span>${tab.label}</span>`;
       btn.addEventListener("click", () => {
-        bar.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+        bar.querySelectorAll("button").forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
         document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
         document.getElementById(`view-${tab.id}`).classList.add("active");
